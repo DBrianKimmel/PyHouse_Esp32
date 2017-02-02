@@ -1,0 +1,74 @@
+menu "WiFi Configuration"
+
+config PYHOUSE_WIFI_SSID
+	string "WiFi SSID"
+	default "myssid"
+	help
+		SSID (network name) to connect to.
+
+config PYHOUSE_WIFI_PASSWORD
+	string "WiFi Password"
+	default "myssid"
+	help
+		WiFi password (WPA or WPA2) to use.
+		Can be left blank if the network has no security set.
+
+endmenu
+
+
+menu "OTA (Over The Air) Configuration"
+
+config OTA_SERVER_IP
+	string "OTA Server IP"
+	default "192.168.0.3"
+	help
+		HTTP Server Name or IP to download the OTA image file from.
+		See README.md for details.
+
+config OTA_SERVER_PORT
+	int "OTA Image - HTTP Server Port"
+	range 1 65535
+	default 8070
+	help
+		HTTP Server port to connect to.
+		Should be chosen not to conflict with any other port used on the system.
+
+config OTA_FILENAME
+	string "OTA Image Filename"
+	default "/hello-world.bin"
+	help
+		Filename of the app image file to download for the OTA update.
+
+endmenu
+
+
+
+menu "Mqtt Configuration"
+
+config MQTT_HOST_NAME
+	string "Mqtt Host name or IP"
+	default ""
+	help
+		The Dns Name or IP of the computer hosting the Mqtt Broker.
+
+config MQTT_HOST_PORT
+	int "Mqtt Host port"
+	range 1 65535
+	default 1883
+	help
+		The Port 1883 - Non-TLS and 8883 = TLS Secure
+
+config MQTT_HOST_USERNAME
+	string "Mqtt broker login username"
+	default ""
+	help
+		The Username used to log in to the Mqtt Broker.
+
+config MQTT_HOST_PASSWORD
+	string "Mqtt broker login password"
+	default ""
+	help
+		The Password used to log in to the Mqtt Broker.
+
+endmenu
+	
