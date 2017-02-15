@@ -1,0 +1,14 @@
+# Project
+
+.settings
+.settings/*
+build
+build/*
+sdkconfig*
+*.old
+.directory
+.project
+.cproject
+CoreDump
+*.o
+*.a
