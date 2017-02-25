@@ -2,13 +2,15 @@
 
 .settings
 .settings/*
-build
-build/*
-sdkconfig*
-*.old
 .directory
 .project
 .cproject
+
+build
+build/*
+
+sdkconfig*
+*.old
 CoreDump
 *.o
 *.a
