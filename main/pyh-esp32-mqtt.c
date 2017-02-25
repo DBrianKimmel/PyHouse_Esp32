@@ -35,7 +35,9 @@
 
 #define MQTT_QOS_0 0
 #define MQTT_RETAIN_0 0
-#define MQTT_CLIENT_ID "PyH-00001"
+// Ideally the numeric portion would be a serial number of this ESP32
+// The "PyH-Esp32" portion is requires by the rest of the PyHouse system and identifies that this package is in use.
+#define MQTT_CLIENT_ID "PyH-Esp32-00001"
 
 static const char *TAG = "PyH_Mqtt";
 
@@ -52,13 +54,12 @@ QueueHandle_t  				g_QueueHandle;
 /*
  *
  */
-RINGBUF g_RingBufer = {
-};
+RINGBUF   g_RingBufer;
 
 /*
  * The payload portion of a MQTT message
  */
-mqtt_message_t g_Payload = {
+mqtt_message_t   g_Payload = {
 	.PayloadData = 			(uint8_t*)"",
 	.PayloadLength = 		0,
 };
@@ -66,95 +67,102 @@ mqtt_message_t g_Payload = {
 /*
  *
  */
-mqtt_connect_info_t g_ConnectInfo = {
-		.client_id =		"",
-		.will_topic =		"",
-		.will_message =		"",
-		.keepalive =		0,
-		.will_qos =			0,
-		.will_retain =		0,
-		.clean_session = 	0,
+ConnectInfo_t   g_ConnectInfo = {
+	.ClientId =				"",
+	.WillTopic =			"",
+	.WillMessage =			"",
+	.Keepalive =			0,
+	.WillQos =				0,
+	.WillRetain =			0,
+	.CleanSession = 		0,
 };
 
 /**
  *
  */
-BrokerConfig g_Broker = {
-		.Host =             CONFIG_MQTT_HOST_NAME,
-		.Port =             CONFIG_MQTT_HOST_PORT,
-		.Client_id =        MQTT_CLIENT_ID,
-		.Username =         CONFIG_MQTT_HOST_USERNAME,
-		.Password =         CONFIG_MQTT_HOST_PASSWORD,
+BrokerConfig_t   g_Broker = {
+	.Host =             	CONFIG_MQTT_HOST_NAME,
+	.Port =             	CONFIG_MQTT_HOST_PORT,
+	.Client_id =        	MQTT_CLIENT_ID,
+	.Username =         	CONFIG_MQTT_HOST_USERNAME,
+	.Password =         	CONFIG_MQTT_HOST_PASSWORD,
+	.ConnectInfo =			&g_ConnectInfo,
 };
 
 /**
  *
  */
-Callback g_CallBack = {
-		.connected_cb =		*cb_connected,
-		.disconnected_cb =	*cb_disconnected,
-		.reconnect_cb =		*cb_reconnected,
-		.subscribe_cb =		*cb_subscribe,
-		.publish_cb =		*cb_publish,
-		.data_cb =			*cb_data,
+Callback_t   g_CallBack = {
+	.connected_cb =			*cb_connected,
+	.disconnected_cb =		*cb_disconnected,
+	.reconnect_cb =			*cb_reconnected,
+	.subscribe_cb =			*cb_subscribe,
+	.publish_cb =			*cb_publish,
+	.data_cb =				*cb_data,
 
+};
+
+/**
+ * Last Will and testament is sent in the Connect packet.
+ */
+LastWill_t   g_LastWill = {
+	.Will_topic =			"pyhouse/lwt",
+	.Will_msg =				"offline",
+	.Will_qos =				MQTT_QOS_0,
+	.Will_retain =			MQTT_RETAIN_0,
+//	.clean_session =		0,
+};
+
+/**
+ * Mqtt Packet = message
+ */
+PacketInfo_t   g_Packet = {
+	.PacketType =					0,
+	.PacketId =						0,
+	.PacketTopic =					(uint8_t*)"",
+	.PacketTopic_length = 			0,
+	.PacketPayload =				(uint8_t*)"",
+	.PacketPayload_length = 		0,
+	.PacketPayload_offset = 		0,
+	.Packet_length = 				0,
+	.PacketBuffer =					(uint8_t*)0,
+	.PacketBuffer_length =			0,
 };
 
 /**
  *
  */
-LastWill g_LastWill = {
-		.Will_topic =		"pyhouse/lwt",
-		.Will_msg =			"offline",
-		.Will_qos =			MQTT_QOS_0,
-		.Will_retain =		MQTT_RETAIN_0,
-		.clean_session =	0,
+State_t   g_State = {
+//	.message_length =			0,
+	.message_length_read =		0,
+	.outbound_message =			&g_Payload,
+//	.mqtt_connection =			&g_ConnectInfo,
+	.pending_msg_id = 			0,
+	.pending_msg_type =			0,
+	.pending_publish_qos =		0,
 };
-
-/**
+/*
  *
  */
-MessageInfo g_MessageInfo = {
-	.MessageType =					0,
-	.MessageTopic =					"",
-	.MessageTopic_length = 			0,
-	.MessagePayload =				"",
-	.MessagePayload_length = 		0,
-	.MessagePayload_offset = 		0,
-	.Message_total_length = 		0,
-};
-
-/**
- *
- */
-State g_State = {
-		.in_buffer =			g_BufferIn,
-		.out_buffer =			g_BufferOut,
-		.in_buffer_length =		1024,
-		.out_buffer_length =	1024,
-		.message_length =		0,
-		.message_length_read =	0,
-		.outbound_message =		&g_Payload,
-		.mqtt_connection =		&g_ConnectInfo,
-		.pending_msg_id = 		0,
-		.pending_msg_type =		0,
-		.pending_publish_qos =	0,
+Buffers_t   g_Buffers = {
+	.in_buffer =				g_BufferIn,
+	.out_buffer =				g_BufferOut,
+	.in_buffer_length =			sizeof(g_BufferIn),
+	.out_buffer_length =		sizeof(g_BufferOut),
 };
 
 /*
  * Information about this MQTT client
  */
-Client g_Client  = {
-	.Settings =         		&g_Settings,
+Client_t   g_Client  = {
 	.State =					&g_State,
+	.Buffers =					&g_Buffers,
 	.Broker =					&g_Broker,
 	.Will =						&g_LastWill,
 	.Cb = 						&g_CallBack,
-//	.Connection_info =			&g_ConnectInfo,
+	.Packet =					&g_Packet,
 	.xSendingQueue = 			&g_QueueHandle,
-//	.send_rb = 					&g_RingBufer,
-	.Keep_alive =				0,
-	.Socket =					0,
+	.send_rb = 					&g_RingBufer,
 };
 
 
@@ -164,7 +172,7 @@ Client g_Client  = {
 void cb_connected(void *p_self, void *p_params) {
 	ESP_LOGI(TAG, "Connected Callback\n");
 	xEventGroupSetBits(l_mqtt_event_group, MQTT_CONNECTED_BIT);
-	Client *l_client = (Client *) p_self;
+	Client_t *l_client = (Client_t *) p_self;
 	mqtt_subscribe(l_client, "pyhouse/#", MQTT_QOS_0);
 	mqtt_publish(l_client, "pyhouse/Esp32", "Hello from Esp32 development.", 29, MQTT_QOS_0, MQTT_RETAIN_0);
 }
@@ -212,14 +220,6 @@ void cb_data(void *self, void *params) {
 }
 
 
-void pyh_mqtt_start(){
-	ESP_LOGI(TAG, "Mqtt Starting.");
-	ESP_ERROR_CHECK(mqtt_start(&g_Client));
-	// mqtt_task(&g_Client);
-	// ESP_ERROR_CHECK(mqtt_connect(&g_Client));
-	ESP_LOGI(TAG, "Mqtt Started.\n");
-}
-
 static esp_err_t mqtt_event_handler(void *ctx, system_event_t *p_event) {
     switch(p_event->event_id) {
     case SYSTEM_EVENT_STA_START:
@@ -236,10 +236,24 @@ static esp_err_t mqtt_event_handler(void *ctx, system_event_t *p_event) {
     return ESP_OK;
 }
 
+/*
+ *
+ */
+void pyh_mqtt_start(){
+	ESP_LOGI(TAG, "Mqtt Starting.");
+	ESP_ERROR_CHECK(mqtt_start(&g_Client));
+	// mqtt_task(&g_Client);
+	// ESP_ERROR_CHECK(mqtt_connect(&g_Client));
+	ESP_LOGI(TAG, "Mqtt Started.\n");
+}
+
+/*
+ *
+ */
 void pyh_mqtt_init() {
 	ESP_LOGI(TAG, "Mqtt Initializing");
 	l_mqtt_event_group = xEventGroupCreate();
-	ESP_ERROR_CHECK(mqtt_init(&g_Client))
+	ESP_ERROR_CHECK(mqtt_init(&g_Client));
 	ESP_LOGI(TAG, "Mqtt Initialized.\n");
 }
 

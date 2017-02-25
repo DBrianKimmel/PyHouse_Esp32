@@ -1,12 +1,21 @@
-#ifndef MQTT_MSG_H
-#define MQTT_MSG_H
+#ifndef MQTT_MESSAGE_H
+#define MQTT_MESSAGE_H
+
+/**
+ * @file mqtt_message.h
+ * @brief Handle the message internal composition and decomposition.
+ *
+ */
+
+#include <stdint.h>
 
 #include "mqtt_config.h"
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-/*
+/**
  * Copyright (c) 2014, Stephen Robinson
  * All rights reserved.
  *
@@ -34,8 +43,8 @@ extern "C" {
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
  */
+
 /*    7      6        5        4        3         2         1         0     */
 /*|      --- Message Type----     |  DUP Flag |    QoS Level    | Retain  | */
 /*                    Remaining Length                 */
@@ -72,21 +81,41 @@ typedef struct mqtt_message {
 } mqtt_message_t;
 
 typedef struct mqtt_connection {
-	mqtt_message_t 	message;
+	mqtt_message_t 	*message;
 	uint16_t 		message_id;
-	uint8_t* 		buffer;
+	uint8_t			*buffer;
 	uint16_t 		buffer_length;
 } mqtt_connection_t;
 
-typedef struct mqtt_connect_info {
-//	char* 			client_id;
-//	char* 			will_topic;
-//	char* 			will_message;
-//	int 			keepalive;
-//	int 			will_qos;
-//	int 			will_retain;
-//	int 			clean_session;
-} mqtt_connect_info_t;
+/**
+ * MQTT Packets.
+ * See:  http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.pdf
+ */
+typedef struct PacketInfo {
+	uint8_t				PacketType;
+	uint16_t			PacketId;
+	const uint8_t		*PacketTopic;
+	uint16_t			PacketTopic_length;
+	const uint8_t		*PacketPayload;
+	uint16_t			PacketPayload_offset;
+	uint16_t			PacketPayload_length;
+	uint16_t			Packet_length;
+	uint8_t				*PacketBuffer;
+	uint16_t			PacketBuffer_length;
+} PacketInfo_t;
+
+/*
+ * This details the connection information to a given broker
+ */
+typedef struct ConnectInfo {
+	char* 			ClientId;
+	char* 			WillTopic;
+	char* 			WillMessage;
+	int 			Keepalive;
+	int 			WillQos;
+	int 			WillRetain;
+	int 			CleanSession;
+} ConnectInfo_t;
 
 
 static inline int mqtt_get_type(uint8_t* p_buffer) {
@@ -105,27 +134,27 @@ static inline int mqtt_get_connect_return_code(uint8_t* p_buffer) {
 	return p_buffer[3];
 }
 
-void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length);
+void mqtt_msg_init(PacketInfo_t* connection, uint8_t* buffer, uint16_t buffer_length);
 
 int mqtt_get_total_length(uint8_t* buffer, uint16_t length);
-const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
-const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
+const uint8_t* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
+const uint8_t* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
 
-mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
-mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_pingreq(mqtt_connection_t* connection);
-mqtt_message_t* mqtt_msg_pingresp(mqtt_connection_t* connection);
-mqtt_message_t* mqtt_msg_disconnect(mqtt_connection_t* connection);
+mqtt_message_t* mqtt_msg_connect(PacketInfo_t* connection, ConnectInfo_t* info);
+mqtt_message_t* mqtt_msg_publish(PacketInfo_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
+mqtt_message_t* mqtt_msg_puback(PacketInfo_t* connection, uint16_t message_id);
+mqtt_message_t* mqtt_msg_pubrec(PacketInfo_t* connection, uint16_t message_id);
+mqtt_message_t* mqtt_msg_pubrel(PacketInfo_t* connection, uint16_t message_id);
+mqtt_message_t* mqtt_msg_pubcomp(PacketInfo_t* connection, uint16_t message_id);
+mqtt_message_t* mqtt_msg_subscribe(PacketInfo_t* connection, const char* topic, int qos, uint16_t* message_id);
+mqtt_message_t* mqtt_msg_unsubscribe(PacketInfo_t* connection, const char* topic, uint16_t* message_id);
+mqtt_message_t* mqtt_msg_pingreq(PacketInfo_t* connection);
+mqtt_message_t* mqtt_msg_pingresp(PacketInfo_t* connection);
+mqtt_message_t* mqtt_msg_disconnect(PacketInfo_t* connection);
 
 #ifdef  __cplusplus
 }
 #endif
 
-#endif  /* MQTT_MSG_H */
+#endif  /* MQTT_MESSAGE_H */
