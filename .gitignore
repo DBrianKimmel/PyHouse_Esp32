@@ -1,16 +1,13 @@
 # Project
 
 .settings
-.settings/*
 .directory
 .project
 .cproject
 
 build
-build/*
 
 sdkconfig*
 *.old
-CoreDump
 *.o
 *.a
