@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "esp_err.h"
+
 typedef struct {
 	uint8_t*            p_o; /**< Original pointer */
 	uint8_t* volatile   p_r; /**< Read pointer */
@@ -12,7 +14,7 @@ typedef struct {
 	int32_t             block_size;
 } RINGBUF;
 
-int32_t rb_init(RINGBUF *r, uint8_t* buf, int32_t size, int32_t block_size);
+esp_err_t rb_init(RINGBUF *r, uint8_t* buf, int32_t size, int32_t block_size);
 int32_t rb_put(RINGBUF *r, uint8_t* c);
 int32_t rb_get(RINGBUF *r, uint8_t* c);
 int32_t rb_available(RINGBUF *r);

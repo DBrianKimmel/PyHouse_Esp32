@@ -32,13 +32,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <mqtt_message.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "esp_log.h"
 
 #include "mqtt_config.h"
+#include "mqtt.h"
+#include "mqtt_message.h"
+#include "mqtt_debug.h"
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 3
 
@@ -55,11 +57,11 @@ enum mqtt_connect_flag {
 struct __attribute((__packed__)) mqtt_connect_variable_header {
 	uint8_t lengthMsb;
 	uint8_t lengthLsb;
-#if defined(CONFIG_MQTT_PROTOCOL_311)
+//#if defined(CONFIG_MQTT_PROTOCOL_311)
 	uint8_t magic[4];
-#else
-	uint8_t magic[6];
-#endif
+//#else
+//	uint8_t magic[6];
+//#endif
 	uint8_t version;
 	uint8_t flags;
 	uint8_t keepaliveMsb;
@@ -99,25 +101,26 @@ static uint16_t append_message_id(PacketInfo_t* p_connection, uint16_t message_i
 	return message_id;
 }
 
+
 static int init_message(PacketInfo_t* p_connection) {
-	ESP_LOGI(TAG, "Init_Message - All");
+	ESP_LOGI(TAG, "105 Init_Message - All");
 	p_connection->PacketPayload_length = MQTT_MAX_FIXED_HEADER_SIZE;
 	return MQTT_MAX_FIXED_HEADER_SIZE;
 }
 
-static PacketInfo_t* fail_message(PacketInfo_t *p_connection) {
-	ESP_LOGW(TAG, "Fail_Message - All");
+esp_err_t fail_message(PacketInfo_t *p_connection) {
+	ESP_LOGW(TAG, "111 Fail_Message - All");
 	// Reset the buffer
 	p_connection->PacketPayload = p_connection->PacketBuffer;
 	p_connection->PacketPayload_length = 0;
-	return p_connection;
+	return ESP_FAIL;
 }
 
 /*
  *
  */
-static PacketInfo_t* fini_message(PacketInfo_t* p_connection, int type, int dup, int qos, int retain) {
-	ESP_LOGI(TAG, "Fini_Message - All");
+esp_err_t fini_message(PacketInfo_t* p_connection, int type, int dup, int qos, int retain) {
+	ESP_LOGI(TAG, "122 Fini_Message - All");
 	int remaining_length = p_connection->PacketPayload_length - MQTT_MAX_FIXED_HEADER_SIZE;
 	if (remaining_length > 127) {
 		p_connection->PacketBuffer[0] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
@@ -131,18 +134,25 @@ static PacketInfo_t* fini_message(PacketInfo_t* p_connection, int type, int dup,
 		p_connection->PacketPayload_length = remaining_length + 2;
 		p_connection->PacketPayload = p_connection->PacketBuffer + 1;
 	}
-	return p_connection;
+	return ESP_OK;
 }
+
+
+
+
+
+
+
 
 /**
  * Setup the connection information (p_connection).
  */
-void mqtt_msg_init(PacketInfo_t *p_packet, uint8_t *p_buffer, uint16_t p_buffer_length) {
-	ESP_LOGI(TAG, "134 Msg_init - Begin. %d", sizeof(p_packet));
+void mqtt_msg_init(PacketInfo_t* p_packet, uint8_t *p_buffer, uint16_t p_buffer_length) {
+	ESP_LOGI(TAG, "150 Msg_init - Begin.");
 	memset(p_packet, 0, sizeof(PacketInfo_t));
 	p_packet->PacketBuffer = p_buffer;
 	p_packet->PacketBuffer_length = p_buffer_length;
-	ESP_LOGI(TAG, "142 mqtt_msg_init - Exit ")
+	ESP_LOGI(TAG, "154 mqtt_msg_init - Exit ")
 }
 
 /*
@@ -288,6 +298,9 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
 	}
 }
 
+
+
+
 /*
  * CONNECT – Client requests a connection to a Server
  *
@@ -301,18 +314,18 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
  *
  * @param p_connection is
  * @param p_info is
- * @returns xxx
+ * @returns mqtt_message_t
  */
-mqtt_message_t* mqtt_msg_connect(PacketInfo_t* p_connection, ConnectInfo_t *p_info) {
+esp_err_t mqtt_msg_connect(Client_t* p_client, ConnectInfo_t *p_info) {
 	struct mqtt_connect_variable_header* variable_header;
-	ESP_LOGI(TAG, "Msg_Connect - Start");
-	init_message(p_connection);
-	if (p_connection->PacketPayload_length + sizeof(*variable_header) > p_connection->PacketBuffer_length) {
-		ESP_LOGE(TAG, "Msg_Connect - Failed - Too big for buffer")
-		return fail_message(p_connection);
+	ESP_LOGI(TAG, "320 Msg_Connect - Begin.");
+	init_message(p_client->Packet);
+	if (p_client->Packet->PacketPayload_length + sizeof(*variable_header) > p_client->Packet->PacketBuffer_length) {
+		ESP_LOGE(TAG, "323 Msg_Connect - Failed - Too big for buffer")
+		return fail_message(p_client->Packet);
 	}
-	variable_header = (void*) (p_connection->PacketBuffer + p_connection->PacketPayload_length);
-	p_connection->PacketPayload_length += sizeof(*variable_header);
+	variable_header = (void*) (p_client->Packet->PacketBuffer + p_client->Packet->PacketPayload_length);
+	p_client->Packet->PacketPayload_length += sizeof(*variable_header);
 	variable_header->lengthMsb = 0;
 //#if defined(CONFIG_MQTT_PROTOCOL_311)
 	variable_header->lengthLsb = 4;
@@ -327,52 +340,56 @@ mqtt_message_t* mqtt_msg_connect(PacketInfo_t* p_connection, ConnectInfo_t *p_in
 	variable_header->keepaliveMsb = p_info->Keepalive >> 8;
 	variable_header->keepaliveLsb = p_info->Keepalive & 0xff;
 
+	ESP_LOGI(TAG, "342 Msg_Connect - AddClean.");
 	if (p_info->CleanSession) {
 		variable_header->flags |= MQTT_CONNECT_FLAG_CLEAN_SESSION;
 	}
 	if (p_info->ClientId != 0 && p_info->ClientId[0] != '\0') {
-		if (append_string(p_connection, p_info->ClientId, strlen(p_info->ClientId)) < 0) {
+		if (append_string(p_client->Packet, p_info->ClientId, strlen(p_info->ClientId)) < 0) {
 			ESP_LOGE(TAG, "Msg_Connect - Failed - Wrong ID")
-			return fail_message(p_connection);
+			return fail_message(p_client->Packet);
 		}
 	} else {
-		return fail_message(p_connection);
+		ESP_LOGE(TAG, "352 Msg_Connect - Bad ID");
+		print_packet(p_client->Packet);
+//		return fail_message(p_client->Packet);
 	}
 
 	if (p_info->WillTopic != 0 && p_info->WillTopic[0] != '\0') {
-//		if (append_string(p_connection, p_info->will_topic, strlen(p_info->will_topic)) < 0) {
-//			ESP_LOGE(TAG, "Msg_Connect - Failed - Will 1")
-//			return fail_message(p_connection);
-//		}
-//		if (append_string(p_connection, p_info->will_message, strlen(p_info->will_message)) < 0) {
-//			ESP_LOGE(TAG, "Msg_Connect - Failed - Will 2")
-//			return fail_message(p_connection);
-//		}
-//		variable_header->flags |= MQTT_CONNECT_FLAG_WILL;
-//		if (p_info->will_retain) {
-//			variable_header->flags |= MQTT_CONNECT_FLAG_WILL_RETAIN;
-//		}
-//		variable_header->flags |= (p_info->will_qos & 3) << 3;
+		if (append_string(p_client->Packet, p_info->WillTopic, strlen(p_info->WillTopic)) < 0) {
+			ESP_LOGE(TAG, "359 Msg_Connect - Failed - Will topic bad")
+			return fail_message(p_client->Packet);
+		}
+		if (append_string(p_client->Packet, p_info->WillMessage, strlen(p_info->WillMessage)) < 0) {
+			ESP_LOGE(TAG, "363 Msg_Connect - Failed - Will message bad")
+			return fail_message(p_client->Packet);
+		}
+		variable_header->flags |= MQTT_CONNECT_FLAG_WILL;
+		if (p_info->WillRetain) {
+			variable_header->flags |= MQTT_CONNECT_FLAG_WILL_RETAIN;
+		}
+		variable_header->flags |= (p_info->WillQos & 3) << 3;
 	}
 
-//	if (p_info->username != 0 && p_info->username[0] != '\0') {
-//		if (append_string(p_connection, p_info->username, strlen(p_info->username)) < 0) {
+//	if (p_info-> != 0 && p_info->username[0] != '\0') {
+//		if (append_string(p_client->Packet, p_info->username, strlen(p_info->username)) < 0) {
 //			ESP_LOGE(TAG, "Msg_Connect - Failed - Username")
-//			return fail_message(p_connection);
+//			return fail_message(p_client->Packet);
 //		}
 //		variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
 //	}
 
 //	if (p_info->password != 0 && p_info->password[0] != '\0') {
-//		if (append_string(p_connection, p_info->password, strlen(p_info->password)) < 0) {
+//		if (append_string(p_client->Packet, p_info->password, strlen(p_info->password)) < 0) {
 //			ESP_LOGE(TAG, "Msg_Connect - Failed - Password")
-//			return fail_message(p_connection);
+//			return fail_message(p_client->Packet);
 //		}
 //		variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
 //	}
 
+	print_packet(p_client->Packet);
 	ESP_LOGI(TAG, "Msg_Connect - Suceeded - Connect Message")
-	return fini_message(p_connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
+	return fini_message(p_client->Packet, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 }
 
 /*
@@ -388,7 +405,7 @@ mqtt_message_t* mqtt_msg_connect(PacketInfo_t* p_connection, ConnectInfo_t *p_in
  * PUBLISH – Publish message
  * A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client to transport an Application Message.
  */
-mqtt_message_t* mqtt_msg_publish(PacketInfo_t* p_connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id) {
+esp_err_t mqtt_msg_publish(PacketInfo_t* p_connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id) {
 	init_message(p_connection);
 	ESP_LOGI(TAG, "Msg_Publish - Start");
 	if (topic == 0 || topic[0] == '\0') {
@@ -415,7 +432,7 @@ mqtt_message_t* mqtt_msg_publish(PacketInfo_t* p_connection, const char* topic, 
  * PUBACK – Publish acknowledgement
  * A PUBACK Packet is the response to a PUBLISH Packet with QoS level 1.
  */
-mqtt_message_t* mqtt_msg_puback(PacketInfo_t* p_connection, uint16_t message_id) {
+esp_err_t mqtt_msg_puback(PacketInfo_t* p_connection, uint16_t message_id) {
 	ESP_LOGI(TAG, "Msg_PubAck");
 	init_message(p_connection);
 	if (append_message_id(p_connection, message_id) == 0) {
@@ -429,7 +446,7 @@ mqtt_message_t* mqtt_msg_puback(PacketInfo_t* p_connection, uint16_t message_id)
  * A PUBREC Packet is the response to a PUBLISH Packet with QoS 2.
  * It is the second packet of the QoS 2 protocol exchange.
  */
-mqtt_message_t* mqtt_msg_pubrec(PacketInfo_t* p_connection, uint16_t message_id) {
+esp_err_t mqtt_msg_pubrec(PacketInfo_t* p_connection, uint16_t message_id) {
 	ESP_LOGI(TAG, "Msg_PubRec");
 	init_message(p_connection);
 	if (append_message_id(p_connection, message_id) == 0) {
@@ -443,7 +460,7 @@ mqtt_message_t* mqtt_msg_pubrec(PacketInfo_t* p_connection, uint16_t message_id)
  * A PUBREL Packet is the response to a PUBREC Packet.
  * It is the third packet of the QoS 2 protocol exchange.
  */
-mqtt_message_t* mqtt_msg_pubrel(PacketInfo_t* p_connection, 	uint16_t message_id) {
+esp_err_t mqtt_msg_pubrel(PacketInfo_t* p_connection, 	uint16_t message_id) {
 	ESP_LOGI(TAG, "Msg_PuBRel");
 	init_message(p_connection);
 	if (append_message_id(p_connection, message_id) == 0) {
@@ -457,7 +474,7 @@ mqtt_message_t* mqtt_msg_pubrel(PacketInfo_t* p_connection, 	uint16_t message_id
  * The PUBCOMP Packet is the response to a PUBREL Packet.
  * It is the fourth and final packet of the QoS 2 protocol exchange.
  */
-mqtt_message_t* mqtt_msg_pubcomp(PacketInfo_t* p_connection,
+esp_err_t mqtt_msg_pubcomp(PacketInfo_t* p_connection,
 		uint16_t message_id) {
 	init_message(p_connection);
 	if (append_message_id(p_connection, message_id) == 0) {
@@ -473,7 +490,7 @@ mqtt_message_t* mqtt_msg_pubcomp(PacketInfo_t* p_connection,
  * The Server sends PUBLISH Packets to the Client in order to forward Application Messages that were published to Topics that match these Subscriptions.
  * The SUBSCRIBE Packet also specifies (for each Subscription) the maximum QoS with which the Server can send Application Messages to the Client.
  */
-mqtt_message_t* mqtt_msg_subscribe(PacketInfo_t* p_connection, const char* topic, int qos, uint16_t* message_id) {
+esp_err_t mqtt_msg_subscribe(PacketInfo_t* p_connection, const char* topic, int qos, uint16_t* message_id) {
 	init_message(p_connection);
 	ESP_LOGI(TAG, "Msg_Subscribe");
 	if (topic == 0 || topic[0] == '\0') {
@@ -502,7 +519,7 @@ mqtt_message_t* mqtt_msg_subscribe(PacketInfo_t* p_connection, const char* topic
  * UNSUBSCRIBE – Unsubscribe from topics
  * An UNSUBSCRIBE Packet is sent by the Client to the Server, to unsubscribe from topics.
  */
-mqtt_message_t* mqtt_msg_unsubscribe(PacketInfo_t* p_connection, const char* topic, uint16_t* message_id) {
+esp_err_t mqtt_msg_unsubscribe(PacketInfo_t* p_connection, const char* topic, uint16_t* message_id) {
 	init_message(p_connection);
 	ESP_LOGI(TAG, "Msg_UnSubscribe");
 	if (topic == 0 || topic[0] == '\0')
@@ -528,7 +545,7 @@ mqtt_message_t* mqtt_msg_unsubscribe(PacketInfo_t* p_connection, const char* top
  *   3. Exercise the network to indicate that the Network Connection is active.
  * This Packet is used in Keep Alive processing.
  */
-mqtt_message_t* mqtt_msg_pingreq(PacketInfo_t* p_connection) {
+esp_err_t mqtt_msg_pingreq(PacketInfo_t* p_connection) {
 	ESP_LOGI(TAG, "Msg_PingReq");
 	init_message(p_connection);
 	return fini_message(p_connection, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
@@ -540,7 +557,7 @@ mqtt_message_t* mqtt_msg_pingreq(PacketInfo_t* p_connection) {
  *  It indicates that the Server is alive.
  *  This Packet is used in Keep Alive processing.
  */
-mqtt_message_t* mqtt_msg_pingresp(PacketInfo_t* p_connection) {
+esp_err_t mqtt_msg_pingresp(PacketInfo_t* p_connection) {
 	ESP_LOGI(TAG, "Msg_PingResp");
 	init_message(p_connection);
 	return fini_message(p_connection, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
@@ -551,7 +568,7 @@ mqtt_message_t* mqtt_msg_pingresp(PacketInfo_t* p_connection) {
  * The DISCONNECT Packet is the final Control Packet sent from the Client to the Server.
  * It indicates that the Client is disconnecting cleanly.
  */
-mqtt_message_t* mqtt_msg_disconnect(PacketInfo_t* p_connection) {
+esp_err_t mqtt_msg_disconnect(PacketInfo_t* p_connection) {
 	ESP_LOGI(TAG, "Msg_Disconnect");
 	init_message(p_connection);
 	return fini_message(p_connection, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);

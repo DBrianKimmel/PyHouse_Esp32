@@ -13,8 +13,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
-#include "mqtt_config.h"
+//#include "mqtt_config.h"
+#include "mqtt_structs.h"
 #include "mqtt_message.h"
+#include "mqtt.h"
 #include "mqtt_transport.h"
 #include "ringbuf.h"
 
@@ -29,86 +31,6 @@
 #define ESP_ERR_MQTT_NOT_SUPPORTED 	ESP_ERR_NOT_SUPPORTED     /*!< Indicates that API is not supported yet */
 
 
-typedef void (*mqtt_callback)(void *, void *);
-
-
-/**
- * All Callbacks for the client
- */
-typedef struct Callback {
-	mqtt_callback   connected_cb;
-	mqtt_callback   disconnected_cb;
-	mqtt_callback   reconnect_cb;
-	mqtt_callback   subscribe_cb;
-	mqtt_callback   publish_cb;
-	mqtt_callback   data_cb;
-} Callback_t;
-
-/**
- * LastWillAndTestament for the client
- * If we miss a timeout from the broker, this is what the broker will act on.
- * The broker will send out this Message telling other clients it has lost contact with us.
- */
-typedef struct LastWill {
-	char				Will_topic[32];
-	char				Will_msg[32];
-	uint32_t			Will_qos;
-	uint32_t			Will_retain;
-	uint32_t			Clean_session;
-	uint32_t			Keep_alive;
-} LastWill_t;
-
-/**
- * Broker Information
- * This is the broker (only one) that this client will use.
- */
-typedef struct BrokerConfig {
-	char				Host[64];
-	uint32_t			Port;
-	char				Client_id[64];
-	char				Username[32];
-	char				Password[32];
-	uint32_t			Socket;
-	ConnectInfo_t 		*ConnectInfo;
-} BrokerConfig_t;
-
-/**
- * Buffer runtime stuff
- */
-typedef struct Buffers {
-	uint8_t				*in_buffer;
-	uint8_t				*out_buffer;
-	int					in_buffer_length;
-	int					out_buffer_length;
-} Buffers_t;
-
-/**
- * State runtime stuff
- * This is the state of the Esp32 MQTT Engine.
- */
-typedef struct State {
-	uint16_t			message_length;
-	uint16_t			message_length_read;
-	mqtt_message_t		*outbound_message;
-	mqtt_connection_t	*Connection;
-	uint16_t			pending_msg_id;
-	int					pending_msg_type;
-	int					pending_publish_qos;
-} State_t;
-
-/*
- * Client = Top level MQTT information.
- */
-typedef struct Client {
-	State_t				*State;
-	Buffers_t			*Buffers;
-	BrokerConfig_t		*Broker;
-	LastWill_t			*Will;
-	Callback_t			*Cb;
-	PacketInfo_t		*Packet;  // mqtt_msg.h
-	QueueHandle_t		*xSendingQueue;
-	RINGBUF				*send_rb;
-} Client_t;
 
 
 // New Signatures

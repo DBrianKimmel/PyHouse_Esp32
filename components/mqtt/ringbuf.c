@@ -19,20 +19,20 @@ static const char *TAG = "RingBuff";
  * @param block_size is size of data as block
  * @return 0 if successful, otherwise failed
  */
-int32_t rb_init(RINGBUF *r, uint8_t *buf, int32_t size, int32_t block_size) {
+esp_err_t rb_init(RINGBUF *r, uint8_t *buf, int32_t size, int32_t block_size) {
 	if (r == 0 || buf == 0 || size < 2) {
 		ESP_LOGE(TAG, " 24 rb_init - Invalid Parameters %p  %p  %d  %d", r, buf, size, block_size);
-		return -1;
+		return ESP_FAIL;
 	}
 	if (size % block_size != 0) {
-		return -1;
+		return ESP_FAIL;
 	}
 	r->p_o = r->p_r = r->p_w = buf;
 	r->fill_cnt = 0;
 	r->size = size;
 	r->block_size = block_size;
 	ESP_LOGI(TAG, "34 rb_init - Finished.");
-	return 0;
+	return ESP_OK;
 }
 /**
  * \brief put a character into ring buffer

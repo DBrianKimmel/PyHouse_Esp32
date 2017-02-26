@@ -19,22 +19,17 @@
 
 #include "sdkconfig.h"
 
+#include "mqtt_structs.h"
 #include "ringbuf.h"
-#include "mqtt.h"
+#include "mqtt_message.h"
+#include "mqtt_debug.h"
 #include "mqtt_transport.h"
+#include "mqtt.h"
 
 static TaskHandle_t xMqttTask = NULL;
 static TaskHandle_t xMqttSendingTask = NULL;
 
 static const char *TAG = "Mqtt";
-
-void print_client(Client_t *p_client) {
-	ESP_LOGD(TAG, "ClientDebug - Client:%p", p_client);
-	ESP_LOGD(TAG, "ClientDebug - State:%p; Buffers:%p", p_client->State, p_client->Buffers);
-	ESP_LOGD(TAG, "ClientDebug - Broker:%p; Will:%p", p_client->Broker, p_client->Will);
-	ESP_LOGD(TAG, "ClientDebug - Cb:%p; Packet:%p", p_client->Cb, p_client->Packet);
-	ESP_LOGD(TAG, "ClientDebug - SendingQueue:%p; RingBuff:%p", p_client->xSendingQueue, p_client->send_rb);
-}
 
 /*
  *
@@ -269,7 +264,7 @@ esp_err_t mqtt_publish(Client_t *p_client, char *p_topic, char *p_data, int p_le
  *
  */
 void mqtt_stop() {
-	ESP_LOGI(TAG, "Stop");
+	ESP_LOGI(TAG, "265 Stop");
 }
 
 
@@ -279,11 +274,7 @@ void mqtt_stop() {
  * Set up the data structures
  */
 esp_err_t mqtt_init(Client_t *p_client) {
-	ESP_LOGI(TAG, "Init");
-	ESP_LOGI(TAG, "Init Client: %d;  p_client:%p", sizeof(Client_t), p_client);
-	ESP_LOGI(TAG, "Init State: %d", sizeof(State_t));
-	ESP_LOGI(TAG, "Init LastWill: %d", sizeof(LastWill_t));
-	ESP_LOGI(TAG, "Init Callback: %d", sizeof(Callback_t));
+	ESP_LOGI(TAG, "275 Init");
 	return ESP_ERR_MQTT_OK;
 }
 
@@ -291,7 +282,7 @@ esp_err_t mqtt_init(Client_t *p_client) {
  *
  */
 esp_err_t mqtt_start(Client_t *p_client) {
-	// uint8_t *rb_buf;
+	uint8_t *rb_buf;
 	ESP_LOGI(TAG, "284 Start - Client: %d;  p_client:%p", sizeof(Client_t), p_client);
 	int l_heap = esp_get_free_heap_size();
 	ESP_LOGI(TAG, "289 Start - Heap: (0x%X) %d", l_heap, l_heap);
@@ -310,7 +301,7 @@ esp_err_t mqtt_start(Client_t *p_client) {
 	p_client->xSendingQueue = xQueueCreate(64, sizeof(uint32_t));
 	ESP_LOGI(TAG, "303 Start - Created SendingQueue:%p", p_client->xSendingQueue);
 
-	uint8_t *rb_buf = (uint8_t*) malloc(CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4);
+	rb_buf = (uint8_t*) malloc(CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4);
 	if (rb_buf == 0) {
 		ESP_LOGE(TAG, "307 Start - Not Enough Memory");
 		return ESP_ERR_MQTT_NO_MEM;
@@ -342,7 +333,8 @@ esp_err_t mqtt_connect(Client_t *p_client) {
 
 //	vTaskDelay(10000);
 	mqtt_msg_init(p_client->Packet, p_client->Buffers->out_buffer, p_client->Buffers->out_buffer_length);
-	p_client->Buffers->out_buffer = mqtt_msg_connect(p_client->Packet, &p_client->Broker->ConnectInfo);
+	mqtt_msg_connect(p_client, p_client->Broker->ConnectInfo);
+	p_client->Buffers->out_buffer = (uint8_t *)p_client->Packet;
 
 	p_client->State->pending_msg_type = mqtt_get_type(p_client->State->outbound_message->PayloadData);
 	p_client->State->pending_msg_id   = mqtt_get_id(p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);

@@ -9,11 +9,10 @@
 
 #include <stdint.h>
 
-#include "mqtt_config.h"
+#include "esp_err.h"
 
-#ifdef  __cplusplus
-extern "C" {
-#endif
+#include "mqtt_structs.h"
+#include "mqtt.h"
 
 /**
  * Copyright (c) 2014, Stephen Robinson
@@ -45,10 +44,6 @@ extern "C" {
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*    7      6        5        4        3         2         1         0     */
-/*|      --- Message Type----     |  DUP Flag |    QoS Level    | Retain  | */
-/*                    Remaining Length                 */
-
 enum mqtt_message_type {
 	MQTT_MSG_TYPE_CONNECT = 1,
 	MQTT_MSG_TYPE_CONNACK = 2,
@@ -75,48 +70,6 @@ enum mqtt_connect_return_code {
 	CONNECTION_REFUSE_NOT_AUTHORIZED
 };
 
-typedef struct mqtt_message {
-	uint8_t 		*PayloadData;
-	uint16_t 		PayloadLength;
-} mqtt_message_t;
-
-typedef struct mqtt_connection {
-	mqtt_message_t 	*message;
-	uint16_t 		message_id;
-	uint8_t			*buffer;
-	uint16_t 		buffer_length;
-} mqtt_connection_t;
-
-/**
- * MQTT Packets.
- * See:  http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.pdf
- */
-typedef struct PacketInfo {
-	uint8_t				PacketType;
-	uint16_t			PacketId;
-	const uint8_t		*PacketTopic;
-	uint16_t			PacketTopic_length;
-	const uint8_t		*PacketPayload;
-	uint16_t			PacketPayload_offset;
-	uint16_t			PacketPayload_length;
-	uint16_t			Packet_length;
-	uint8_t				*PacketBuffer;
-	uint16_t			PacketBuffer_length;
-} PacketInfo_t;
-
-/*
- * This details the connection information to a given broker
- */
-typedef struct ConnectInfo {
-	char* 			ClientId;
-	char* 			WillTopic;
-	char* 			WillMessage;
-	int 			Keepalive;
-	int 			WillQos;
-	int 			WillRetain;
-	int 			CleanSession;
-} ConnectInfo_t;
-
 
 static inline int mqtt_get_type(uint8_t* p_buffer) {
 	return (p_buffer[0] & 0xf0) >> 4;
@@ -141,20 +94,16 @@ const uint8_t* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
 const uint8_t* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
 
-mqtt_message_t* mqtt_msg_connect(PacketInfo_t* connection, ConnectInfo_t* info);
-mqtt_message_t* mqtt_msg_publish(PacketInfo_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_puback(PacketInfo_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrec(PacketInfo_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrel(PacketInfo_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubcomp(PacketInfo_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_subscribe(PacketInfo_t* connection, const char* topic, int qos, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_unsubscribe(PacketInfo_t* connection, const char* topic, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_pingreq(PacketInfo_t* connection);
-mqtt_message_t* mqtt_msg_pingresp(PacketInfo_t* connection);
-mqtt_message_t* mqtt_msg_disconnect(PacketInfo_t* connection);
-
-#ifdef  __cplusplus
-}
-#endif
+esp_err_t mqtt_msg_connect(Client_t*, ConnectInfo_t* info);
+esp_err_t mqtt_msg_publish(PacketInfo_t *connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
+esp_err_t mqtt_msg_puback(PacketInfo_t* connection, uint16_t message_id);
+esp_err_t mqtt_msg_pubrec(PacketInfo_t* connection, uint16_t message_id);
+esp_err_t mqtt_msg_pubrel(PacketInfo_t* connection, uint16_t message_id);
+esp_err_t mqtt_msg_pubcomp(PacketInfo_t* connection, uint16_t message_id);
+esp_err_t mqtt_msg_subscribe(PacketInfo_t* connection, const char* topic, int qos, uint16_t* message_id);
+esp_err_t mqtt_msg_unsubscribe(PacketInfo_t* connection, const char* topic, uint16_t* message_id);
+esp_err_t mqtt_msg_pingreq(PacketInfo_t* connection);
+esp_err_t mqtt_msg_pingresp(PacketInfo_t *connection);
+esp_err_t mqtt_msg_disconnect(PacketInfo_t *connection);
 
 #endif  /* MQTT_MESSAGE_H */

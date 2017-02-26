@@ -68,13 +68,13 @@ mqtt_message_t   g_Payload = {
  *
  */
 ConnectInfo_t   g_ConnectInfo = {
-	.ClientId =				"",
-	.WillTopic =			"",
-	.WillMessage =			"",
-	.Keepalive =			0,
+	.ClientId =				"PyH-123",
+	.WillTopic =			"ClientLost",
+	.WillMessage =			"PyH-123 has disappeared",
+	.Keepalive =			61,
 	.WillQos =				0,
 	.WillRetain =			0,
-	.CleanSession = 		0,
+	.CleanSession = 		1,
 };
 
 /**
