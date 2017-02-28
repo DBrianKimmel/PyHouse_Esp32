@@ -22,21 +22,38 @@ typedef void (*mqtt_callback)(void *, void *);
  * All Callbacks for the client
  */
 typedef struct Callback {
-	mqtt_callback   connected_cb;
-	mqtt_callback   disconnected_cb;
-	mqtt_callback   reconnect_cb;
-	mqtt_callback   subscribe_cb;
-	mqtt_callback   publish_cb;
-	mqtt_callback   data_cb;
+	mqtt_callback   	connected_cb;
+	mqtt_callback   	disconnected_cb;
+	mqtt_callback   	reconnect_cb;
+	mqtt_callback   	subscribe_cb;
+	mqtt_callback   	publish_cb;
+	mqtt_callback   	data_cb;
 } Callback_t;
 
 /**
  *
  */
 typedef struct mqtt_message {
-	uint8_t 		*PayloadData;
-	uint16_t 		PayloadLength;
+	uint8_t 			*PayloadData;
+	uint16_t 			PayloadLength;
 } mqtt_message_t;
+
+/*
+ * 10 bytes
+ */
+struct __attribute((__packed__)) mqtt_connect_variable_header {
+	uint8_t				lengthMsb;
+	uint8_t				lengthLsb;
+//#if defined(CONFIG_MQTT_PROTOCOL_311)
+	uint8_t 			magic[4];
+//#else
+//	uint8_t magic[6];
+//#endif
+	uint8_t 			version;
+	uint8_t 			flags;
+	uint8_t 			keepaliveMsb;
+	uint8_t 			keepaliveLsb;
+};
 
 /**
  * MQTT Packets.
@@ -59,13 +76,12 @@ typedef struct PacketInfo {
  * This details the connection information to a given broker
  */
 typedef struct ConnectInfo {
-	char* 			ClientId;
-	char* 			WillTopic;
-	char* 			WillMessage;
-	int 			Keepalive;
-	int 			WillQos;
-	int 			WillRetain;
-	int 			CleanSession;
+	char* 				WillTopic;
+	char* 				WillMessage;
+	int 				Keepalive;
+	int 				WillQos;
+	int 				WillRetain;
+	int 				CleanSession;
 } ConnectInfo_t;
 
 /**
@@ -96,10 +112,10 @@ typedef struct Buffers {
  *
  */
 typedef struct mqtt_connection {
-	mqtt_message_t 	*message;
-	uint16_t 		message_id;
-	uint8_t			*buffer;
-	uint16_t 		buffer_length;
+	mqtt_message_t 		*message;
+	uint16_t 			message_id;
+	uint8_t				*buffer;
+	uint16_t 			buffer_length;
 } mqtt_connection_t;
 
 /**
@@ -113,6 +129,7 @@ typedef struct BrokerConfig {
 	char				Username[32];
 	char				Password[32];
 	uint32_t			Socket;
+	char* 				ClientId;
 	ConnectInfo_t 		*ConnectInfo;
 } BrokerConfig_t;
 

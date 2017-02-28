@@ -70,5 +70,11 @@ config MQTT_HOST_PASSWORD
 	help
 		The Password used to log in to the Mqtt Broker.
 
+config MQTT_CLIENT_ID
+	string "Mqtt Client-Id"
+	default ""
+	help
+		The Identity of this client used for the above Mqtt Broker.
+
 endmenu
 	

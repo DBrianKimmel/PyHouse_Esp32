@@ -13,10 +13,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
-//#include "mqtt_config.h"
 #include "mqtt_structs.h"
 #include "mqtt_message.h"
-#include "mqtt.h"
 #include "mqtt_transport.h"
 #include "ringbuf.h"
 

@@ -68,7 +68,6 @@ mqtt_message_t   g_Payload = {
  *
  */
 ConnectInfo_t   g_ConnectInfo = {
-	.ClientId =				"PyH-123",
 	.WillTopic =			"ClientLost",
 	.WillMessage =			"PyH-123 has disappeared",
 	.Keepalive =			61,
@@ -86,6 +85,7 @@ BrokerConfig_t   g_Broker = {
 	.Client_id =        	MQTT_CLIENT_ID,
 	.Username =         	CONFIG_MQTT_HOST_USERNAME,
 	.Password =         	CONFIG_MQTT_HOST_PASSWORD,
+	.ClientId =				"PyH-123",
 	.ConnectInfo =			&g_ConnectInfo,
 };
 
