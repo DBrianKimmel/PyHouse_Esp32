@@ -62,6 +62,7 @@ struct __attribute((__packed__)) mqtt_connect_variable_header {
 typedef struct PacketInfo {
 	uint8_t				PacketType;
 	uint16_t			PacketId;
+	uint16_t			PacketStart;
 	const uint8_t		*PacketTopic;
 	uint16_t			PacketTopic_length;
 	const uint8_t		*PacketPayload;
@@ -73,29 +74,17 @@ typedef struct PacketInfo {
 } PacketInfo_t;
 
 /**
- * This details the connection information to a given broker
- */
-typedef struct ConnectInfo {
-	char* 				WillTopic;
-	char* 				WillMessage;
-	int 				Keepalive;
-	int 				WillQos;
-	int 				WillRetain;
-	int 				CleanSession;
-} ConnectInfo_t;
-
-/**
  * LastWillAndTestament for the client
  * If we miss a timeout from the broker, this is what the broker will act on.
  * The broker will send out this Message telling other clients it has lost contact with us.
  */
 typedef struct LastWill {
-	char				Will_topic[32];
-	char				Will_msg[32];
-	uint32_t			Will_qos;
-	uint32_t			Will_retain;
-	uint32_t			Clean_session;
-	uint32_t			Keep_alive;
+	char				WillTopic[32];
+	char				WillMessage[32];
+	uint32_t			WillQos;
+	uint32_t			WillRetain;
+	uint32_t			CleanSession;
+	uint32_t			Keepalive;
 } LastWill_t;
 
 /**
@@ -130,7 +119,6 @@ typedef struct BrokerConfig {
 	char				Password[32];
 	uint32_t			Socket;
 	char* 				ClientId;
-	ConnectInfo_t 		*ConnectInfo;
 } BrokerConfig_t;
 
 /*

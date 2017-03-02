@@ -94,13 +94,13 @@ const uint8_t* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
 const uint8_t* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
 
-esp_err_t mqtt_msg_connect(Client_t*, ConnectInfo_t* info);
+esp_err_t mqtt_msg_connect(Client_t*);
 esp_err_t mqtt_msg_publish(PacketInfo_t *connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
 esp_err_t mqtt_msg_puback(PacketInfo_t* connection, uint16_t message_id);
 esp_err_t mqtt_msg_pubrec(PacketInfo_t* connection, uint16_t message_id);
 esp_err_t mqtt_msg_pubrel(PacketInfo_t* connection, uint16_t message_id);
 esp_err_t mqtt_msg_pubcomp(PacketInfo_t* connection, uint16_t message_id);
-esp_err_t mqtt_msg_subscribe(PacketInfo_t* connection, const char* topic, int qos, uint16_t* message_id);
+esp_err_t mqtt_msg_subscribe(Client_t*, const char* topic, int qos, uint16_t* message_id);
 esp_err_t mqtt_msg_unsubscribe(PacketInfo_t* connection, const char* topic, uint16_t* message_id);
 esp_err_t mqtt_msg_pingreq(PacketInfo_t* connection);
 esp_err_t mqtt_msg_pingresp(PacketInfo_t *connection);

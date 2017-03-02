@@ -42,27 +42,27 @@ static int resolve_dns(const char *host, struct sockaddr_in *ip) {
 int mqtt_transport_connect(const char *p_host, int p_port) {
 	int l_sock;
 	struct sockaddr_in l_remote_ip;
-	ESP_LOGI(TAG, "Client_Connect - Begin     ");
+	ESP_LOGI(TAG, " 45 Client_Connect - Begin     ");
 	while (1) {
 		bzero(&l_remote_ip, sizeof(struct sockaddr_in));
 		l_remote_ip.sin_family = AF_INET;
 		//if stream_host is not ip address, resolve it
 		if (inet_aton(p_host, &(l_remote_ip.sin_addr)) == 0) {
-			ESP_LOGI(TAG, "Client_Connect - Resolve dns for domain: %s", p_host);
+			ESP_LOGI(TAG, " 51 Client_Connect - Resolve dns for domain: %s", p_host);
 			if (!resolve_dns(p_host, &l_remote_ip)) {
 				vTaskDelay(1000 / portTICK_RATE_MS);
 				continue;
 			}
 		}
-		l_sock = socket(PF_INET, SOCK_STREAM, 0);
+		l_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (l_sock == -1) {
 			continue;
 		}
 		l_remote_ip.sin_port = htons(p_port);
-		ESP_LOGI(TAG, "Client_Connect - Connecting to server %s: port:%d, From Local port:%d", inet_ntoa((l_remote_ip.sin_addr)), p_port, l_remote_ip.sin_port);
+		ESP_LOGI(TAG, " 62 Client_Connect - Connecting to server %s: port:%d, From Local port:%d", inet_ntoa((l_remote_ip.sin_addr)), p_port, l_remote_ip.sin_port);
 		if (connect(l_sock, (struct sockaddr * )(&l_remote_ip), sizeof(struct sockaddr)) != 00) {
 			close(l_sock);
-			ESP_LOGE(TAG, "Client_Connect - Network Connection error.");
+			ESP_LOGE(TAG, " 65 Client_Connect - Network Connection error.");
 			vTaskDelay(1000 / portTICK_RATE_MS);
 			continue;
 		}

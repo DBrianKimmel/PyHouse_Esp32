@@ -13,7 +13,7 @@
 #include "mqtt.h"
 #include "mqtt_debug.h"
 
-static const char *TAG = "MqttDebug";
+static const char *TAG = "MqttDebug     ";
 
 
 /**
@@ -24,23 +24,25 @@ void print_string(char *p_string) {
 }
 
 char *dump_packet(uint8_t *p_buff, int p_len) {
-	int l_ix, l_outix = 0;
+	int l_ix;
+	int l_outix = 0;
 	char *l_str = malloc(512);
 	char *l_chr = malloc(6);
 	char l_byte;
+
 	for (l_ix = 0; l_ix < p_len; l_ix++) {
 		l_byte = p_buff[l_ix];
 		if (l_byte < 32 || l_byte > 127) {
-			sprintf(l_chr, "\\%02X ", p_buff[l_ix]);
+			sprintf(l_chr, "\\%02X ", l_byte);
 			memcpy(&l_str[l_outix], l_chr, 3);
-			l_str[l_outix+2] = ' ';
 			l_outix += 3;
 		} else {
 			l_str[l_outix++] = l_byte;
 		}
 	}
-	l_str[++l_ix] = '<';
-	l_str[++l_ix] = 0;
+	l_str[l_outix++] = '<';
+	l_str[l_outix++] = '<';
+	l_str[l_outix++] = 0;
 	return l_str;
 }
 

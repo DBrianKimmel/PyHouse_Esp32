@@ -28,16 +28,18 @@
 static TaskHandle_t xMqttTask = NULL;
 static TaskHandle_t xMqttSendingTask = NULL;
 
-static const char *TAG = "Mqtt";
+static const char *TAG = "Mqtt          ";
 
 /*
  *
  */
 static void mqtt_queue(Client_t *p_client) {
-// TODO: detect buffer full (ringbuf and queue)
-	ESP_LOGI(TAG, "Mqtt_Queue - All");
+// TOD: detect buffer full (ringbuf and queue)
+	ESP_LOGI(TAG, " 38 Mqtt_Queue - All");
 	rb_write(p_client->send_rb, p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);
+	ESP_LOGI(TAG, " 40 Mqtt_Queue - All");
 	xQueueSend(p_client->xSendingQueue, &p_client->State->outbound_message->PayloadLength, 0);
+	ESP_LOGI(TAG, " 42 Mqtt_Queue - All");
 }
 
 /*
@@ -47,7 +49,7 @@ void mqtt_sending_task(void *pvParameters) {
 	Client_t *l_client = (Client_t *) pvParameters;
 	uint32_t msg_len, send_len;
 
-	ESP_LOGI(TAG, "47 Sending_Task - Begin");
+	ESP_LOGI(TAG, " 47 Sending_Task - Begin");
 	while (1) {
 		if (xQueueReceive(l_client->xSendingQueue, &msg_len, 1000 / portTICK_RATE_MS)) {
 			//queue available
@@ -55,17 +57,17 @@ void mqtt_sending_task(void *pvParameters) {
 				send_len = msg_len;
 				if (send_len > CONFIG_MQTT_BUFFER_SIZE_BYTE)
 					send_len = CONFIG_MQTT_BUFFER_SIZE_BYTE;
-				ESP_LOGE(TAG, "55 Sending_Task - Sending...%d bytes", send_len);
+				ESP_LOGE(TAG, " 55 Sending_Task - Sending...%d bytes", send_len);
 
 				rb_read(l_client->send_rb, l_client->Buffers->out_buffer, send_len);
 				l_client->State->pending_msg_type = mqtt_get_type(l_client->Buffers->out_buffer);
 				l_client->State->pending_msg_id = mqtt_get_id(l_client->Buffers->out_buffer, send_len);
 				write(l_client->Broker->Socket, l_client->Buffers->out_buffer, send_len);
-				//TODO: Check sending type, to callback publish message
+				//TOD: Check sending type, to callback publish message
 				msg_len -= send_len;
 			}
 			//invalidate keepalive timer
-			//l_client->Keep_alive = l_client->Will->Keep_alive / 2;
+			l_client->Will->Keepalive = l_client->Will->Keepalive / 2;
 		} else {
 //			if (l_client->keepalive_tick > 0)
 //				l_client->keepalive_tick--;
@@ -74,12 +76,12 @@ void mqtt_sending_task(void *pvParameters) {
 //				l_client->State->outbound_message = mqtt_msg_pingreq(l_client->State->mqtt_connection);
 				l_client->State->pending_msg_type = mqtt_get_type(l_client->State->outbound_message->PayloadData);
 				l_client->State->pending_msg_id = mqtt_get_id(l_client->State->outbound_message->PayloadData, l_client->State->outbound_message->PayloadLength);
-				ESP_LOGE(TAG, "Sending_Task - Sending pingreq");
+				ESP_LOGE(TAG, " 77 Sending_Task - Sending pingreq");
 				write(l_client->Broker->Socket, l_client->State->outbound_message->PayloadData, l_client->State->outbound_message->PayloadLength);
 //			}
 		}
 	}
-	ESP_LOGI(TAG, "479 Sending_Task - Exiting");
+	ESP_LOGI(TAG, " 82 Sending_Task - Exiting");
 	vTaskDelete(NULL);
 }
 
@@ -89,7 +91,7 @@ void mqtt_sending_task(void *pvParameters) {
 void deliver_publish(Client_t *p_client, uint8_t *p_message, int p_length) {
 	PacketInfo_t  event_data;
 	int len_read, total_mqtt_len = 0, mqtt_len = 0, mqtt_offset = 0;
-	ESP_LOGI(TAG, "Deliver Publish");
+	ESP_LOGI(TAG, " 92 Deliver Publish");
 	do {
 		event_data.PacketTopic_length = p_length;
 		event_data.PacketTopic = mqtt_get_publish_topic(p_message, &event_data.PacketTopic_length);
@@ -104,7 +106,7 @@ void deliver_publish(Client_t *p_client, uint8_t *p_message, int p_length) {
 		event_data.Packet_length = total_mqtt_len;
 		event_data.PacketPayload_offset = mqtt_offset;
 		event_data.PacketPayload_length = mqtt_len;
-		ESP_LOGI(TAG, "Data received: %d/%d bytes ", mqtt_len, total_mqtt_len);
+		ESP_LOGI(TAG, "107 Data received: %d/%d bytes ", mqtt_len, total_mqtt_len);
 		if (p_client->Cb->data_cb) {
 			p_client->Cb->data_cb(p_client, &event_data);
 		}
@@ -215,9 +217,9 @@ esp_err_t mqtt_destroy(Client_t *p_client) {
  *
  */
 esp_err_t mqtt_subscribe(Client_t *p_client, char *topic, uint8_t qos) {
-	ESP_LOGI(TAG, "240 Subscribe - Begin");
-//	p_client->Buffers->outbound_message = mqtt_msg_subscribe(p_client->State->mqtt_connection, topic, qos, &p_client->State->pending_msg_id);
-	ESP_LOGI(TAG, "Subscribe - Queue subscribe, topic\"%s\", id: %d", topic, p_client->State->pending_msg_id);
+	ESP_LOGI(TAG, "218 Subscribe - Begin");
+	mqtt_msg_subscribe(p_client, topic, qos, &p_client->State->pending_msg_id);
+	ESP_LOGI(TAG, "220 Subscribe - Queue subscribe, topic\"%s\", id: %d", topic, p_client->State->pending_msg_id);
 	mqtt_queue(p_client);
 	return ESP_ERR_MQTT_OK;
 }
@@ -240,6 +242,12 @@ void mqtt_stop() {
 	ESP_LOGI(TAG, "265 Stop");
 }
 
+
+
+
+
+
+
 /*
  * mqtt_connect
  * input - client
@@ -249,58 +257,68 @@ esp_err_t mqtt_connect(Client_t *p_client) {
 	struct timeval tv;
 	tv.tv_sec = 10; /* 30 Secs Timeout */
 	tv.tv_usec = 0;  // Not init'ing this can cause strange error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 s
-	ESP_LOGI(TAG, "252 Connect - Begin.");
+	ESP_LOGI(TAG, "260 Connect - Begin.");
 	print_client(p_client);
 
-	setsockopt(p_client->Broker->Socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(struct timeval));
-	ESP_LOGI(TAG, "256 Connect - Socket options set");
+	uint32_t  l_socket = p_client->Broker->Socket;
+	setsockopt(l_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(struct timeval));
+	ESP_LOGI(TAG, "265 Connect - Socket options set");
 
 //	vTaskDelay(10000);
 	mqtt_msg_init(p_client->Packet, p_client->Buffers->out_buffer, p_client->Buffers->out_buffer_length);
-	mqtt_msg_connect(p_client, p_client->Broker->ConnectInfo);
+	mqtt_msg_connect(p_client);
 	p_client->Buffers->out_buffer = (uint8_t *)p_client->Packet;
+
 
 	p_client->State->pending_msg_type = mqtt_get_type(p_client->State->outbound_message->PayloadData);
 	p_client->State->pending_msg_id   = mqtt_get_id(p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);
-	ESP_LOGI(TAG, "265 Connect - Sending MQTT CONNECT message, MsgType: %d, MessageId: %04X", p_client->State->pending_msg_type, p_client->State->pending_msg_id);
+	ESP_LOGI(TAG, "275 Connect - Sending MQTT CONNECT message, MsgType: %d, MessageId: %04X", p_client->State->pending_msg_type, p_client->State->pending_msg_id);
+
 
 	print_packet(p_client->Packet);
-	int write_len = write(p_client->Broker->Socket, p_client->Packet->PacketBuffer, p_client->Packet->Packet_length);
-	ESP_LOGI(TAG, "269 Connect - Write Len: %d;  %d ", write_len, p_client->Packet->Packet_length)
+	int write_len = write(l_socket, &p_client->Packet->PacketBuffer[p_client->Packet->PacketStart], p_client->Packet->PacketPayload_length);
+	ESP_LOGI(TAG, "280 Connect - Write Len: %d;  %d ", write_len, p_client->Packet->PacketPayload_length)
+	vTaskDelay(100);
 
-	ESP_LOGI(TAG, "270 Connect - Reading MQTT CONNECT response message");
-	int read_len = read(p_client->Broker->Socket, p_client->Buffers->in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE);
-	ESP_LOGI(TAG, "272 Connect - ReadLen: %d; %d", read_len, sizeof(p_client->Buffers->in_buffer));
+
+
+	ESP_LOGI(TAG, "285 Connect - Reading MQTT CONNECT response message  Socket: %d;  Len:%d", l_socket, CONFIG_MQTT_BUFFER_SIZE_BYTE);
+	int read_len = read(l_socket, p_client->Buffers->in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE);
+	ESP_LOGI(TAG, "287 Connect - ReadLen: %d;  Buffer:%p", read_len, p_client->Buffers->in_buffer);
 
 	tv.tv_sec = 0; /* No timeout */
-	setsockopt(p_client->Broker->Socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
+	setsockopt(l_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
+
+
 
 	if (read_len < 0) {
-		ESP_LOGE(TAG, "278 Connect - Error network response");
+		ESP_LOGE(TAG, "295 Connect - Error network response");
 		return ESP_ERR_MQTT_FAIL;
 	}
+
 	if (mqtt_get_type(p_client->Buffers->in_buffer) != MQTT_MSG_TYPE_CONNACK) {
-		ESP_LOGE(TAG, "360 Connect - Invalid MSG_TYPE response: %d, read_len: %d", mqtt_get_type(p_client->Buffers->in_buffer), read_len);
+		ESP_LOGE(TAG, "300 Connect - Invalid MSG_TYPE response: %d, read_len: %d", mqtt_get_type(p_client->Buffers->in_buffer), read_len);
 		return ESP_ERR_MQTT_FAIL;
 	}
 	int connect_rsp_code = mqtt_get_connect_return_code(p_client->Buffers->in_buffer);
 	switch (connect_rsp_code) {
 		case CONNECTION_ACCEPTED:
-			ESP_LOGI(TAG, "288 Connect - Connected");
-			return ESP_ERR_MQTT_OK;
+			ESP_LOGI(TAG, "306 Connect - Connected");
+			return ESP_OK;
 
 		case CONNECTION_REFUSE_PROTOCOL:
 		case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
 		case CONNECTION_REFUSE_BAD_USERNAME:
 		case CONNECTION_REFUSE_NOT_AUTHORIZED:
-			ESP_LOGW(TAG, "295 Connect - Connection refused, reason code: %d", connect_rsp_code);
+			ESP_LOGW(TAG, "313 Connect - Connection refused, reason code: %d", connect_rsp_code);
 			return ESP_ERR_MQTT_FAIL;
 		default:
-			ESP_LOGW(TAG, "298 Connect - Connection refused, Unknown reason");
+			ESP_LOGW(TAG, "316 Connect - Connection refused, Unknown reason");
 			return ESP_ERR_MQTT_FAIL;
 	}
-	return ESP_ERR_MQTT_OK;
+	return ESP_OK;
 }
+
 
 /*
  * A FreeRtos TASK.
@@ -309,25 +327,26 @@ esp_err_t mqtt_connect(Client_t *p_client) {
  */
 void mqtt_task(void *pvParameters) {
 	Client_t *l_client = (Client_t *) pvParameters;
-	ESP_LOGI(TAG, "310 Task - Begin.  l_client:%p", l_client);
+	ESP_LOGI(TAG, "330 Task - Begin.  l_client:%p", l_client);
 	while (1) {
-		l_client->Broker->Socket = mqtt_transport_connect(l_client->Broker->Host, l_client->Broker->Port);  // Establish a network connection
-		if (!mqtt_connect(l_client)) {
-			ESP_LOGE(TAG, "315 Task - Connect Failed");
+		// Establish a network connection
+		l_client->Broker->Socket = mqtt_transport_connect(l_client->Broker->Host, l_client->Broker->Port);
+		if (mqtt_connect(l_client) != ESP_OK) {
+			ESP_LOGE(TAG, "335 Task - Connect Failed");
 			continue;
 		}
-		ESP_LOGI(TAG, "318 Task - Connected to MQTT broker, create sending thread before call connected callback");
+		ESP_LOGI(TAG, "338 Task - Connected to MQTT broker, create sending thread before call connected callback");
 		xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, l_client, CONFIG_MQTT_PRIORITY + 1, &xMqttSendingTask);
 		if (l_client->Cb->connected_cb) {
 			l_client->Cb->connected_cb(l_client, NULL);
 		}
-		ESP_LOGI(TAG, "323 Task - mqtt_start_receive_schedule");
+		ESP_LOGI(TAG, "343 Task - mqtt_start_receive_schedule");
 		mqtt_start_receive_schedule(l_client);
 		close(l_client->Broker->Socket);
 		vTaskDelete(xMqttSendingTask);
 		vTaskDelay(1000 / portTICK_RATE_MS);
 	}
-	ESP_LOGW(TAG, "329 Task Exiting")
+	ESP_LOGW(TAG, "349 Task Exiting")
 	mqtt_destroy(NULL);
 }
 
@@ -347,8 +366,8 @@ esp_err_t mqtt_start(Client_t *p_client) {
 //	p_client->connect_info.will_qos = p_settings->lwt_qos;
 //	p_client->connect_info.will_retain = p_settings->lwt_retain;
 //	p_client->keepalive_tick = p_settings->keepalive / 2;
-	p_client->Broker->ConnectInfo->Keepalive = 60;
-	p_client->Broker->ConnectInfo->CleanSession = 1;
+	p_client->Will->Keepalive = 60;
+	p_client->Will->CleanSession = 1;
 //	p_client->State.connect_info = &p_client->connect_info;
 
 	/* Create a queue capable of containing 64 unsigned long values. */

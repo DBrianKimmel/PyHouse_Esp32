@@ -9,7 +9,9 @@
 
 #include "esp_log.h"
 
-static const char *TAG = "RingBuff";
+static const char *TAG = "RingBuff      ";
+
+
 
 /**
  * @brief init a RINGBUF object
@@ -34,6 +36,9 @@ esp_err_t rb_init(RINGBUF *r, uint8_t *buf, int32_t size, int32_t block_size) {
 	ESP_LOGI(TAG, "34 rb_init - Finished.");
 	return ESP_OK;
 }
+
+
+
 /**
  * \brief put a character into ring buffer
  * \param r pointer to a ringbuf object
@@ -43,23 +48,25 @@ esp_err_t rb_init(RINGBUF *r, uint8_t *buf, int32_t size, int32_t block_size) {
 int32_t rb_put(RINGBUF *r, uint8_t *c) {
 	int32_t i;
 	uint8_t *data = c;
-	if (r->fill_cnt >= r->size)
+	if (r->fill_cnt >= r->size) {
 		return -1; // ring buffer is full, this should be atomic operation
-
+	}
 	r->fill_cnt += r->block_size; // increase filled slots count, this should be atomic operation
-
 	for (i = 0; i < r->block_size; i++) {
 		*r->p_w = *data;              // put character into buffer
 
 		r->p_w++;
 		data++;
 	}
-
-	if (r->p_w >= r->p_o + r->size)     // rollback if write pointer go pass
+	if (r->p_w >= r->p_o + r->size) {
+		// rollback if write pointer go pass
 		r->p_w = r->p_o;          // the physical boundary
-
+	}
 	return 0;
 }
+
+
+
 /**
  * \brief get a character from ring buffer
  * \param r pointer to a ringbuf object
@@ -83,9 +90,13 @@ int32_t rb_get(RINGBUF *r, uint8_t *c) {
 	return 0;
 }
 
+
+
 int32_t rb_available(RINGBUF *r) {
 	return (r->size - r->fill_cnt);
 }
+
+
 
 uint32_t rb_read(RINGBUF *r, uint8_t *buf, int len) {
 	int n = 0;
@@ -101,6 +112,11 @@ uint32_t rb_read(RINGBUF *r, uint8_t *buf, int len) {
 	return n;
 }
 
+
+
+/*
+ *
+ */
 uint32_t rb_write(RINGBUF *r, uint8_t *buf, int len) {
 	uint32_t wi;
 	for (wi = 0; wi < len; wi++) {
@@ -109,3 +125,5 @@ uint32_t rb_write(RINGBUF *r, uint8_t *buf, int len) {
 	}
 	return 0;
 }
+
+// ### END DBK
