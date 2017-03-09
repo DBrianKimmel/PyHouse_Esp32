@@ -112,9 +112,10 @@ static uint16_t append_message_id(PacketInfo_t* p_packet, uint16_t message_id) {
  *
  */
 static int init_message(PacketInfo_t* p_packet) {
-	ESP_LOGI(TAG, "115 Init_Message - All");
+	ESP_LOGI(TAG, "115 Init_Message - All - Buffer:%p", p_packet->PacketBuffer);
 	p_packet->PacketPayload = p_packet->PacketBuffer;
 	p_packet->PacketPayload_length = MQTT_MAX_FIXED_HEADER_SIZE;
+	ESP_LOGI(TAG, "115 Init_Message - All");
 	return MQTT_MAX_FIXED_HEADER_SIZE;
 }
 
@@ -307,7 +308,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
 			if (mqtt_get_qos(buffer) > 0) {
 				if (i + 2 >= length)
 					return 0;
-				//i += 2;
+				i += 2;
 			} else {
 				return 0;
 			}
@@ -320,8 +321,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
 		case MQTT_MSG_TYPE_SUBACK:
 		case MQTT_MSG_TYPE_UNSUBACK:
 		case MQTT_MSG_TYPE_SUBSCRIBE: {
-			// This requires the remaining length to be encoded in 1 byte,
-			// which it should be.
+			// This requires the remaining length to be encoded in 1 byte, which it should be.
 			if (length >= 4 && (buffer[1] & 0x80) == 0) {
 				return (buffer[2] << 8) | buffer[3];
 			} else {
@@ -408,25 +408,25 @@ esp_err_t mqtt_msg_connect(Client_t* p_client) {
 		l_variable_header->flags |= (p_client->Will->WillQos & 3) << 3;
 	}
 
-//	if (p_info-> != 0 && p_info->username[0] != '\0') {
-//		if (append_string(p_client->Packet, p_info->username, strlen(p_info->username)) < 0) {
-//			ESP_LOGE(TAG, "379 Msg_Connect - Failed - Username")
-//			return fail_message(p_client->Packet);
-//		}
-//		l_variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
-//	}
+	if (p_client->Broker->Username != 0 && p_client->Broker->Username[0] != '\0') {
+		if (append_string(p_client->Packet, p_client->Broker->Username, strlen(p_client->Broker->Username)) < 0) {
+			ESP_LOGE(TAG, "413 Msg_Connect - Failed - Username")
+			return fail_message(p_client->Packet);
+		}
+		l_variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
+	}
 
-//	if (p_info->password != 0 && p_info->password[0] != '\0') {
-//		if (append_string(p_client->Packet, p_info->password, strlen(p_info->password)) < 0) {
-//			ESP_LOGE(TAG, "387 Msg_Connect - Failed - Password")
-//			return fail_message(p_client->Packet);
-//		}
-//		l_variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
-//	}
+	if (p_client->Broker->Password != 0 && p_client->Broker->Password[0] != '\0') {
+		if (append_string(p_client->Packet, p_client->Broker->Password, strlen(p_client->Broker->Password)) < 0) {
+			ESP_LOGE(TAG, "421 Msg_Connect - Failed - Password")
+			return fail_message(p_client->Packet);
+		}
+		l_variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
+	}
 
 	fini_message(p_client->Packet, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 	print_packet(p_client->Packet);
-	ESP_LOGI(TAG, "420 Msg_Connect - Suceeded - Connect Message")
+	ESP_LOGI(TAG, "429 Msg_Connect - Succeeded - Connect Message")
 	return ESP_OK;
 }
 
@@ -450,13 +450,14 @@ esp_err_t mqtt_msg_connect(Client_t* p_client) {
 
 
 
+
 /*
  * PUBLISH – Publish message
  * A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client to transport an Application Message.
  */
 esp_err_t mqtt_msg_publish(PacketInfo_t* p_packet, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id) {
 	init_message(p_packet);
-	ESP_LOGI(TAG, "450 Msg_Publish - Start");
+	ESP_LOGI(TAG, "460 Msg_Publish - Start");
 	if (topic == 0 || topic[0] == '\0') {
 		return fail_message(p_packet);
 	}
@@ -570,8 +571,10 @@ esp_err_t mqtt_msg_pubcomp(PacketInfo_t* p_packet, uint16_t message_id) {
  * SUBSCRIBE - Subscribe to topics
  * The SUBSCRIBE Packet is sent from the Client to the Server to create one or more Subscriptions.
  * Each Subscription registers a Client’s interest in one or more Topics.
- * The Server sends PUBLISH Packets to the Client in order to forward Application Messages that were published to Topics that match these Subscriptions.
- * The SUBSCRIBE Packet also specifies (for each Subscription) the maximum QoS with which the Server can send Application Messages to the Client.
+ * The Server sends PUBLISH Packets to the Client in order to forward Application Messages that were published
+ *  to Topics that match these Subscriptions.
+ * The SUBSCRIBE Packet also specifies (for each Subscription) the maximum QoS with which the Server can send
+ *  Application Messages to the Client.
  *
  * @param p_client
  */

@@ -15,6 +15,7 @@
 
 void print_client(Client_t *p_client);
 void print_packet(PacketInfo_t *p_packet);
+void print_buffer(void *, uint16_t Length);
 
 
 #endif /* COMPONENTS_MQTT_MQTT_DEBUG_H_ */

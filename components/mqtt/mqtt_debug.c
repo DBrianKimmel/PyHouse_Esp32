@@ -23,14 +23,14 @@ void print_string(char *p_string) {
 	ESP_LOGD(TAG, "String:%s", p_string);
 }
 
-char *dump_packet(uint8_t *p_buff, int p_len) {
+char *dump_packet(uint8_t *p_buff, int p_len, int p_start) {
 	int l_ix;
 	int l_outix = 0;
 	char *l_str = malloc(512);
 	char *l_chr = malloc(6);
 	char l_byte;
 
-	for (l_ix = 0; l_ix < p_len; l_ix++) {
+	for (l_ix = p_start; l_ix < p_len; l_ix++) {
 		l_byte = p_buff[l_ix];
 		if (l_byte < 32 || l_byte > 127) {
 			sprintf(l_chr, "\\%02X ", l_byte);
@@ -55,21 +55,26 @@ void print_heap(void) {
 }
 
 void print_client(Client_t *p_client) {
-	ESP_LOGD(TAG, "ClientDebug - Client:%p", p_client);
-	ESP_LOGD(TAG, "ClientDebug - State:%p; Buffers:%p", p_client->State, p_client->Buffers);
-	ESP_LOGD(TAG, "ClientDebug - Broker:%p; Will:%p", p_client->Broker, p_client->Will);
-	ESP_LOGD(TAG, "ClientDebug - Cb:%p; Packet:%p", p_client->Cb, p_client->Packet);
-	ESP_LOGD(TAG, "ClientDebug - SendingQueue:%p; RingBuff:%p", p_client->xSendingQueue, p_client->send_rb);
+	ESP_LOGD(TAG, "ClientDebug - ClientPtr:%p", p_client);
+	ESP_LOGD(TAG, "ClientDebug - StatePtr:%p; BuffersPtr:%p", p_client->State, p_client->Buffers);
+	ESP_LOGD(TAG, "ClientDebug - BrokerPtr:%p; WillPtr:%p", p_client->Broker, p_client->Will);
+	ESP_LOGD(TAG, "ClientDebug - CbPtr:%p; PacketPtr:%p", p_client->Cb, p_client->Packet);
+	ESP_LOGD(TAG, "ClientDebug - SendingQueuePtr:%p; RingBuffPtr:%p", p_client->SendingQueue, p_client->Send_rb);
 	ESP_LOGD(TAG, " ");
 }
 
 void print_packet(PacketInfo_t *p_packet) {
-	ESP_LOGD(TAG, "PacketDebug - Packet:%p;  Type:%d;  Id:%d", p_packet, p_packet->PacketType, p_packet->PacketId);
-	ESP_LOGD(TAG, "PacketDebug - BuffersLen:%d;  Buffer:%p", p_packet->PacketBuffer_length, p_packet->PacketBuffer);
-	ESP_LOGD(TAG, "PacketDebug - TopicLen:%d;  Topic:%p", p_packet->PacketTopic_length, p_packet->PacketTopic);
-	ESP_LOGD(TAG, "PacketDebug - PayloadLen:%d;  PayloadOffset:%d;  Payload:%p", p_packet->PacketPayload_length, p_packet->PacketPayload_offset, p_packet->PacketPayload);
-//	ESP_LOGD(TAG, "PacketDebug - SendingQueue:%p;  RingBuff:%p", p_packet->xSendingQueue, p_packet->send_rb);
-	ESP_LOGD(TAG, "Packet: %s ", dump_packet(p_packet->PacketBuffer, p_packet->PacketPayload_length))
+	ESP_LOGD(TAG, "PacketDebug - PacketPtr:%p;  Type:%d;  Id:%d", p_packet, p_packet->PacketType, p_packet->PacketId);
+	ESP_LOGD(TAG, "PacketDebug - BuffersLen:%d;  BufferPtr:%p", p_packet->PacketBuffer_length, p_packet->PacketBuffer);
+	ESP_LOGD(TAG, "PacketDebug - TopicLen:%d;  TopicPtr:%p", p_packet->PacketTopic_length, p_packet->PacketTopic);
+	ESP_LOGD(TAG, "PacketDebug - PayloadLen:%d;  PayloadOffset:%d;  PayloadPtr:%p", p_packet->PacketPayload_length, p_packet->PacketPayload_offset, p_packet->PacketPayload);
+//	ESP_LOGD(TAG, "PacketDebug - SendingQueuePtr:%p;  RingBuffPtr:%p", p_packet->SendingQueue, p_packet->Send_rb);
+	ESP_LOGD(TAG, "Packet: %s ", dump_packet(p_packet->PacketBuffer, p_packet->PacketPayload_length, p_packet->PacketStart))
+	ESP_LOGD(TAG, " ");
+}
+
+void print_buffer(void *p_buffer, uint16_t p_len) {
+	ESP_LOGD(TAG, "Buffer: >>%s", dump_packet(p_buffer, p_len, 0));
 	ESP_LOGD(TAG, " ");
 }
 

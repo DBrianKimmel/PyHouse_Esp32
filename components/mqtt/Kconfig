@@ -1,38 +1,11 @@
 menu "MQTT"
 
-# This is actually also handled in the ESP32 startup code, not only in FreeRTOS.
-config MQTT_PROTOCOL_311
-	bool "MQTT Protocol version 3.1.1"
-	default y
-	help
-		If disable, it will use MQTT protocol version 3.1
-
 config MQTT_SECURITY_ON
-    bool "Enable MQTT over SSL"
+    bool "Enable MQTT TLS"
     default n
     help
-        Enable MQTT Over SSL
+        Enable MQTT Over TLS
 
-config MQTT_PRIORITY
-    int "MQTT Task Priority"
-    range 1 15
-    default 5
-
-config MQTT_LOG_ERROR_ON
-    bool "Enable MQTT Debug message"
-    default y
-    help
-        Disable it will redurce memory and run faster
-config MQTT_LOG_WARN_ON
-    bool "Enable MQTT Warning message"
-    default y
-    help
-        Disable it will redurce memory and run faster
-config MQTT_LOG_INFO_ON
-    bool "Enable MQTT Info message"
-    default y
-    help
-        Disable it will redurce memory and run faster
 config MQTT_RECONNECT_TIMEOUT
     int "Reconnect timeout (in second)"
     range 10 16535
@@ -67,10 +40,12 @@ config MQTT_MAX_PASSWORD_LEN
     int "Maximum mqtt password len - in byte"
     range 4 128
     default 32
+
 config MQTT_MAX_LWT_TOPIC
     int "Maximum mqtt lwt topic len - in byte"
     range 4 128
     default 32
+
 config MQTT_MAX_LWT_MSG
     int "Maximum mqtt lwt message len - in byte"
     range 4 128

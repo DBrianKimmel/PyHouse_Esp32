@@ -36,9 +36,10 @@
 /**
  * @brief Initialize the esp Mqtt subsystem.
  */
-esp_err_t mqtt_init(Client_t*);
+esp_err_t Mqtt_init(Client_t*);
+esp_err_t Mqtt_start(Client_t*, char* will_topic, char* will_message);
+
 void mqtt_task(void *);
-esp_err_t mqtt_start(Client_t*);
 esp_err_t mqtt_connect(Client_t*);
 esp_err_t mqtt_detroy(Client_t*);
 esp_err_t mqtt_subscribe(Client_t*, char*, uint8_t);

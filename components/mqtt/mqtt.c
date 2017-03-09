@@ -30,20 +30,25 @@ static TaskHandle_t xMqttSendingTask = NULL;
 
 static const char *TAG = "Mqtt          ";
 
+uint8_t		g_BufferIn;
+uint8_t 	g_BufferOut;
+
 /*
- *
+ * Write the payload
  */
 static void mqtt_queue(Client_t *p_client) {
 // TOD: detect buffer full (ringbuf and queue)
 	ESP_LOGI(TAG, " 38 Mqtt_Queue - All");
-	rb_write(p_client->send_rb, p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);
-	ESP_LOGI(TAG, " 40 Mqtt_Queue - All");
-	xQueueSend(p_client->xSendingQueue, &p_client->State->outbound_message->PayloadLength, 0);
+	print_buffer(p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);
+	rb_write(p_client->Send_rb, p_client->State->outbound_message->PayloadData, p_client->State->outbound_message->PayloadLength);
+	xQueueSend(p_client->SendingQueue, &p_client->State->outbound_message->PayloadLength, 0);
 	ESP_LOGI(TAG, " 42 Mqtt_Queue - All");
 }
 
+
+
 /*
- * A FreeRtos TASK
+ * A FreeRtos TASK for sending packets.
  */
 void mqtt_sending_task(void *pvParameters) {
 	Client_t *l_client = (Client_t *) pvParameters;
@@ -51,36 +56,40 @@ void mqtt_sending_task(void *pvParameters) {
 
 	ESP_LOGI(TAG, " 47 Sending_Task - Begin");
 	while (1) {
-		if (xQueueReceive(l_client->xSendingQueue, &msg_len, 1000 / portTICK_RATE_MS)) {
+		// this loop checks for some packet to be sent
+		if (xQueueReceive(l_client->SendingQueue, &msg_len, 1000 / portTICK_RATE_MS)) {
 			//queue available
 			while (msg_len > 0) {
 				send_len = msg_len;
-				if (send_len > CONFIG_MQTT_BUFFER_SIZE_BYTE)
+				if (send_len > CONFIG_MQTT_BUFFER_SIZE_BYTE) {
 					send_len = CONFIG_MQTT_BUFFER_SIZE_BYTE;
+				}
 				ESP_LOGE(TAG, " 55 Sending_Task - Sending...%d bytes", send_len);
 
-				rb_read(l_client->send_rb, l_client->Buffers->out_buffer, send_len);
+				rb_read(l_client->Send_rb, l_client->Buffers->out_buffer, send_len);
 				l_client->State->pending_msg_type = mqtt_get_type(l_client->Buffers->out_buffer);
 				l_client->State->pending_msg_id = mqtt_get_id(l_client->Buffers->out_buffer, send_len);
 				write(l_client->Broker->Socket, l_client->Buffers->out_buffer, send_len);
 				//TOD: Check sending type, to callback publish message
 				msg_len -= send_len;
 			}
-			//invalidate keepalive timer
-			l_client->Will->Keepalive = l_client->Will->Keepalive / 2;
+			//invalidate keep alive timer
+			l_client->Will->Keepalive_tick = l_client->Will->Keepalive / 2;
 		} else {
-//			if (l_client->keepalive_tick > 0)
-//				l_client->keepalive_tick--;
-//			else {
-//				l_client->keepalive_tick = l_client->settings->keepalive / 2;
-//				l_client->State->outbound_message = mqtt_msg_pingreq(l_client->State->mqtt_connection);
+			if (l_client->Will->Keepalive_tick > 0)
+				l_client->Will->Keepalive_tick--;
+			else {
+				l_client->Will->Keepalive_tick = l_client->Will->Keepalive / 2;
+				mqtt_msg_pingreq(l_client->Packet);
+// ??				l_client->Buffers->out_buffer = l_client->Packet;
 				l_client->State->pending_msg_type = mqtt_get_type(l_client->State->outbound_message->PayloadData);
 				l_client->State->pending_msg_id = mqtt_get_id(l_client->State->outbound_message->PayloadData, l_client->State->outbound_message->PayloadLength);
 				ESP_LOGE(TAG, " 77 Sending_Task - Sending pingreq");
 				write(l_client->Broker->Socket, l_client->State->outbound_message->PayloadData, l_client->State->outbound_message->PayloadLength);
-//			}
+			}
 		}
 	}
+	vQueueDelete(l_client->SendingQueue);
 	ESP_LOGI(TAG, " 82 Sending_Task - Exiting");
 	vTaskDelete(NULL);
 }
@@ -98,7 +107,7 @@ void deliver_publish(Client_t *p_client, uint8_t *p_message, int p_length) {
 		event_data.PacketPayload_length = p_length;
 		event_data.PacketPayload = mqtt_get_publish_data(p_message, &event_data.PacketPayload_length);
 		if (total_mqtt_len == 0) {
-//			total_mqtt_len = p_client->State->message_length - p_client->State->message_length_read + event_data.PacketPayload_length;
+			total_mqtt_len = p_client->State->message_length - p_client->State->message_length_read + event_data.PacketPayload_length;
 			mqtt_len = event_data.PacketPayload_length;
 		} else {
 			mqtt_len = len_read;
@@ -111,8 +120,8 @@ void deliver_publish(Client_t *p_client, uint8_t *p_message, int p_length) {
 			p_client->Cb->data_cb(p_client, &event_data);
 		}
 		mqtt_offset += mqtt_len;
-//		if (p_client->State->message_length_read >= p_client->State->message_length)
-//			break;
+		if (p_client->State->message_length_read >= p_client->State->message_length)
+			break;
 		len_read = read(p_client->Broker->Socket, p_client->Buffers->in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE);
 		p_client->State->message_length_read += len_read;
 	} while (1);
@@ -152,19 +161,19 @@ void mqtt_start_receive_schedule(Client_t *p_client) {
 				ESP_LOGI(TAG, "Receive_Schedule - UnSubscribe successful");
 			break;
 		case MQTT_MSG_TYPE_PUBLISH:
-//			if (msg_qos == 1)
-//				p_client->State->outbound_message = mqtt_msg_puback(p_client->State->mqtt_connection, msg_id);
-//			else if (msg_qos == 2)
-//				p_client->State->outbound_message = mqtt_msg_pubrec(p_client->State->mqtt_connection, msg_id);
+			if (msg_qos == 1) {
+				mqtt_msg_puback(p_client->State->Connection, msg_id);
+				p_client->Buffers->out_buffer = p_client->State->Connection;
+			} else if (msg_qos == 2) {
+				mqtt_msg_pubrec(p_client->State->Connection, msg_id);
+				p_client->State->outbound_message = p_client->State->Connection;
+			}
 			if (msg_qos == 1 || msg_qos == 2) {
 				ESP_LOGI(TAG,"Receive_Schedule - Queue response QoS: %d", msg_qos);
 				mqtt_queue(p_client);
-				// if (QUEUE_Puts(&client->msgQueue, client->mqtt_state.outbound_message->data, client->mqtt_state.outbound_message->length) == -1) {
-				//     mqtt_info("MQTT: Queue full");
-				// }
 			}
 			p_client->State->message_length_read = read_len;
-//			p_client->State->message_length = mqtt_get_total_length(p_client->Buffers->in_buffer, p_client->State->message_length_read);
+			p_client->State->message_length = mqtt_get_total_length(p_client->Buffers->in_buffer, p_client->State->message_length_read);
 			ESP_LOGI(TAG, "Receive_Schedule - deliver_publish");
 
 			deliver_publish(p_client, p_client->Buffers->in_buffer, p_client->State->message_length_read);
@@ -177,11 +186,13 @@ void mqtt_start_receive_schedule(Client_t *p_client) {
 
 			break;
 		case MQTT_MSG_TYPE_PUBREC:
-//			p_client->State->outbound_message = mqtt_msg_pubrel(p_client->State->mqtt_connection, msg_id);
+			mqtt_msg_pubrel(p_client->State->Connection, msg_id);
+			p_client->Buffers->out_buffer = p_client->State->Connection;
 			mqtt_queue(p_client);
 			break;
 		case MQTT_MSG_TYPE_PUBREL:
-//			p_client->Buffers->outbound_message = mqtt_msg_pubcomp(p_client->State->mqtt_connection, msg_id);
+			mqtt_msg_pubcomp(p_client->State->Connection, msg_id);
+			p_client->Buffers->out_buffer = p_client->State->Connection;
 			mqtt_queue(p_client);
 			break;
 		case MQTT_MSG_TYPE_PUBCOMP:
@@ -190,7 +201,8 @@ void mqtt_start_receive_schedule(Client_t *p_client) {
 			}
 			break;
 		case MQTT_MSG_TYPE_PINGREQ:
-//			p_client->Buffers->outbound_message = mqtt_msg_pingresp(p_client->State->mqtt_connection);
+			mqtt_msg_pingresp(p_client->State->Connection);
+			p_client->Buffers->out_buffer = p_client->State->Connection;
 			mqtt_queue(p_client);
 			break;
 		case MQTT_MSG_TYPE_PINGRESP:
@@ -224,14 +236,18 @@ esp_err_t mqtt_subscribe(Client_t *p_client, char *topic, uint8_t qos) {
 	return ESP_ERR_MQTT_OK;
 }
 
+
+
+
 /*
  *
  */
 esp_err_t mqtt_publish(Client_t *p_client, char *p_topic, char *p_data, int p_len, int p_qos, int p_retain) {
-	ESP_LOGI(TAG, "250 Publish - Begin");
-//	p_client->Buffers->outbound_message = mqtt_msg_publish(p_client->State->mqtt_connection, p_topic, p_data, p_len, p_qos, p_retain, &p_client->State->pending_msg_id);
+	ESP_LOGI(TAG, "240 Publish - Begin");
+	p_client->Buffers->out_buffer = mqtt_msg_publish(p_client->State->Connection, p_topic, p_data, p_len, p_qos, p_retain, &p_client->State->pending_msg_id);
 	mqtt_queue(p_client);
-//	ESP_LOGI(TAG, "Queuing publish, length: %d, queue size(%d/%d)\r\n", p_client->State->outbound_message->PayloadLength, p_client->send_rb.fill_cnt, p_client->send_rb.size);
+	ESP_LOGI(TAG, "Queuing publish, length: %d, queue size(%d/%d)\r\n",
+			p_client->State->outbound_message->PayloadLength, p_client->Send_rb->fill_cnt, p_client->Send_rb->size);
 	return ESP_ERR_MQTT_OK;
 }
 
@@ -285,10 +301,10 @@ esp_err_t mqtt_connect(Client_t *p_client) {
 	ESP_LOGI(TAG, "285 Connect - Reading MQTT CONNECT response message  Socket: %d;  Len:%d", l_socket, CONFIG_MQTT_BUFFER_SIZE_BYTE);
 	int read_len = read(l_socket, p_client->Buffers->in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE);
 	ESP_LOGI(TAG, "287 Connect - ReadLen: %d;  Buffer:%p", read_len, p_client->Buffers->in_buffer);
+	print_buffer(p_client->Buffers->in_buffer, read_len);
 
 	tv.tv_sec = 0; /* No timeout */
 	setsockopt(l_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
-
 
 
 	if (read_len < 0) {
@@ -325,18 +341,18 @@ esp_err_t mqtt_connect(Client_t *p_client) {
  * Network connect to the broker.
  * Create a sending task.
  */
-void mqtt_task(void *pvParameters) {
+void Mqtt_transport_task(void *pvParameters) {
 	Client_t *l_client = (Client_t *) pvParameters;
-	ESP_LOGI(TAG, "330 Task - Begin.  l_client:%p", l_client);
+	ESP_LOGI(TAG, "346 Task - Begin.  l_client:%p", l_client);
 	while (1) {
-		// Establish a network connection
+		// Establish a transport connection
 		l_client->Broker->Socket = mqtt_transport_connect(l_client->Broker->Host, l_client->Broker->Port);
 		if (mqtt_connect(l_client) != ESP_OK) {
 			ESP_LOGE(TAG, "335 Task - Connect Failed");
 			continue;
 		}
 		ESP_LOGI(TAG, "338 Task - Connected to MQTT broker, create sending thread before call connected callback");
-		xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, l_client, CONFIG_MQTT_PRIORITY + 1, &xMqttSendingTask);
+		xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, l_client, 6, &xMqttSendingTask);
 		if (l_client->Cb->connected_cb) {
 			l_client->Cb->connected_cb(l_client, NULL);
 		}
@@ -353,39 +369,20 @@ void mqtt_task(void *pvParameters) {
 
 
 
+
+
+
+
 /*
  *
  */
-esp_err_t mqtt_start(Client_t *p_client) {
-	uint8_t *rb_buf;
-	ESP_LOGI(TAG, "340 Start - Begin.");
+esp_err_t Mqtt_start(Client_t *p_client, char* p_will_topic, char* p_will_message) {
+	ESP_LOGI(TAG, "380 Start - Begin.");
 
-//	p_client->connect_info.client_id = p_settings->client_id;
-//	p_client->connect_info.will_topic = p_settings->lwt_topic;
-//	p_client->connect_info.will_message = p_settings->lwt_msg;
-//	p_client->connect_info.will_qos = p_settings->lwt_qos;
-//	p_client->connect_info.will_retain = p_settings->lwt_retain;
-//	p_client->keepalive_tick = p_settings->keepalive / 2;
-	p_client->Will->Keepalive = 60;
-	p_client->Will->CleanSession = 1;
-//	p_client->State.connect_info = &p_client->connect_info;
+	ESP_LOGI(TAG, "382 Start - Creating transport task");
+	xTaskCreate(&Mqtt_transport_task, "Mqtt_transport_task", 2048, p_client, 5, &xMqttTask);
 
-	/* Create a queue capable of containing 64 unsigned long values. */
-	p_client->xSendingQueue = xQueueCreate(64, sizeof(uint32_t));
-	ESP_LOGI(TAG, "354 Start - Created SendingQueue:%p", p_client->xSendingQueue);
-
-	rb_buf = (uint8_t*) malloc(CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4);
-	if (rb_buf == 0) {
-		ESP_LOGE(TAG, "358 Start - Not Enough Memory");
-		return ESP_ERR_MQTT_NO_MEM;
-	}
-	rb_init(p_client->send_rb, rb_buf, CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4, 1);
-	mqtt_msg_init(p_client->Packet, p_client->Buffers->out_buffer, p_client->Buffers->out_buffer_length);
-
-	ESP_LOGI(TAG, "364 Start - Creating another task - send_rb:%p; Packet:%p", p_client->send_rb, p_client->Packet);
-	xTaskCreate(&mqtt_task, "mqtt_task", 2048, p_client, CONFIG_MQTT_PRIORITY, &xMqttTask);
-
-	ESP_LOGI(TAG, "367 Start - Done.");
+	ESP_LOGI(TAG, "385 Start - Done.");
 	return ESP_ERR_MQTT_OK;
 }
 
@@ -394,13 +391,135 @@ esp_err_t mqtt_start(Client_t *p_client) {
 
 
 
+
+
+
 /*
- * Set up the data structures
+ * Set up the Last Will and Testament structure.
  */
-esp_err_t mqtt_init(Client_t *p_client) {
-	ESP_LOGI(TAG, "380 Init - All");
+esp_err_t Mqtt_init_will(Will_t *p_will) {
+	int l_len = 0;
+	p_will = calloc(1, sizeof(Will_t));
+	ESP_LOGI(TAG, "415 Setup Will - Begin  Will:%p", p_will);
+	p_will->WillTopic = calloc(32, sizeof(uint8_t));
+	l_len = snprintf(p_will->WillTopic, 32, "pyhouse/%s/lwt", CONFIG_PYHOUSE_HOUSE_NAME);
+	if (l_len < 0) {
+		ESP_LOGE(TAG, "419 Will topic too long");
+		return ESP_ERR_INVALID_SIZE;
+	}
+	p_will->WillMessage = calloc(32, sizeof(uint8_t));
+	l_len = snprintf(p_will->WillMessage, 32, "%s Offline", CONFIG_MQTT_CLIENT_ID);
+	if (l_len < 0) {
+		ESP_LOGE(TAG, "425 Will message too long");
+		return ESP_ERR_INVALID_SIZE;
+	}
+	p_will->WillQos = 0;
+	p_will->WillRetain = 0;
+	p_will->CleanSession = 0;
+	p_will->Keepalive = 60;
+	p_will->Keepalive_tick = 30;
+	ESP_LOGI(TAG, "433 Will has been set up. Will:%p", p_will);
+	return ESP_OK;
+}
+
+
+esp_err_t Mqtt_init_state(Client_t *p_client) {
+	ESP_LOGI(TAG, "439 InitState - All");
+	return ESP_OK;
+}
+
+esp_err_t Mqtt_init_ring_buffer(Client_t *p_client) {
+	uint8_t *l_rb_buf;
+	ESP_LOGI(TAG, "445 InitRingBuff - All");
+	l_rb_buf = (uint8_t*) malloc(CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4);
+	if (l_rb_buf == 0) {
+		ESP_LOGE(TAG, "442 Start - Not Enough Memory");
+		return ESP_ERR_NO_MEM;
+	}
+	p_client->Send_rb = l_rb_buf;
+	rb_init(p_client->Send_rb, l_rb_buf, CONFIG_MQTT_QUEUE_BUFFER_SIZE_WORD * 4, 1);
+	ESP_LOGI(TAG, "467 InitRingBuffer - Created RingBuffer:%p", p_client->Send_rb);
+	return ESP_OK;
+}
+
+esp_err_t Mqtt_init_sending_queue(Client_t *p_client) {
+	p_client->SendingQueue = xQueueCreate(64, sizeof(uint32_t));
+	ESP_LOGI(TAG, "459 InitSendingQueue - All");
+	if (p_client->SendingQueue == NULL){
+		ESP_LOGE(TAG, "459 Start Failed to create a Packet Sending Queue");
+		return ESP_ERR_NO_MEM;
+	}
+	ESP_LOGI(TAG, "462 InitSendingQueue - Created SendingQueue:%p", p_client->SendingQueue);
+	return ESP_OK;
+}
+
+
+esp_err_t Mqtt_init_packet(Client_t *p_client) {
+	ESP_LOGI(TAG, "470 InitPacket - All");
+	mqtt_msg_init(p_client->Packet, p_client->Buffers->out_buffer, p_client->Buffers->out_buffer_length);
+	return ESP_OK;
+}
+
+
+
+
+
+esp_err_t Mqtt_init_callback(Client_t *p_client) {
+	ESP_LOGI(TAG, "480 InitCallback - All");
+	return ESP_OK;
+}
+
+esp_err_t Mqtt_init_buffers(Buffers_t *p_buffers) {
+	ESP_LOGI(TAG, "485 InitBuffers - All");
+	p_buffers->in_buffer_length = 1024;
+	p_buffers->in_buffer = calloc(1024, sizeof(uint8_t));
+	p_buffers->out_buffer_length = 1024;
+	p_buffers->out_buffer = calloc(1024, sizeof(uint8_t));
+	return ESP_OK;
+}
+
+
+esp_err_t Mqtt_init_broker(BrokerConfig_t *p_broker) {
+	ESP_LOGI(TAG, "495 InitBroker - All");
+	snprintf(p_broker->Host, 64, "%s", CONFIG_MQTT_HOST_NAME);
+	p_broker->Port = CONFIG_MQTT_HOST_PORT;
+	snprintf(p_broker->Username, 64, "%s", CONFIG_MQTT_HOST_USERNAME);
+	snprintf(p_broker->Password, 64, "%s", CONFIG_MQTT_HOST_PASSWORD);
+	snprintf(p_broker->ClientId, 64, "%s", CONFIG_MQTT_CLIENT_ID);
+	return ESP_OK;
+}
+
+
+
+
+
+/*
+ * Set up the data structures, Allocate memory.
+ */
+esp_err_t Mqtt_init(Client_t *p_client) {
+	uint8_t *rb_buf;
+	int l_len;
+
+	ESP_LOGI(TAG, "515 Init - All");
+	p_client           = calloc(1, sizeof(Client_t));
+	p_client->Broker   = calloc(1, sizeof(BrokerConfig_t));
+	p_client->Buffers  = calloc(1, sizeof(Buffers_t));
+	p_client->Cb       = calloc(1, sizeof(Callback_t));
+	p_client->Packet   = calloc(1, sizeof(PacketInfo_t));
+	p_client->State    = calloc(1, sizeof(State_t));
+	ESP_LOGI(TAG, "522 Init - Main allocated");
+
+	Mqtt_init_broker(p_client->Broker);
+	Mqtt_init_buffers(p_client->Buffers);
+	Mqtt_init_callback(p_client);
+	Mqtt_init_packet(p_client);
+	Mqtt_init_sending_queue(p_client);
+	Mqtt_init_ring_buffer(p_client);
+	Mqtt_init_state(p_client);
+	Mqtt_init_will(p_client->Will);
+	ESP_LOGI(TAG, "532 Init - Sub allocs done.");
+
 	print_client(p_client);
-	memset(p_client->Buffers->in_buffer, 0, 1024);
 	return ESP_ERR_MQTT_OK;
 }
 

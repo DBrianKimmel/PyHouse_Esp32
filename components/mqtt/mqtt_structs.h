@@ -74,18 +74,19 @@ typedef struct PacketInfo {
 } PacketInfo_t;
 
 /**
- * LastWillAndTestament for the client
+ * Last Will And Testament for the client
  * If we miss a timeout from the broker, this is what the broker will act on.
  * The broker will send out this Message telling other clients it has lost contact with us.
  */
-typedef struct LastWill {
-	char				WillTopic[32];
-	char				WillMessage[32];
+typedef struct Will {
+	char				*WillTopic;
+	char				*WillMessage;
 	uint32_t			WillQos;
 	uint32_t			WillRetain;
 	uint32_t			CleanSession;
 	uint32_t			Keepalive;
-} LastWill_t;
+	uint32_t			Keepalive_tick;
+} Will_t;
 
 /**
  * Buffer runtime stuff
@@ -114,11 +115,10 @@ typedef struct mqtt_connection {
 typedef struct BrokerConfig {
 	char				Host[64];
 	uint32_t			Port;
-	char				Client_id[64];
 	char				Username[32];
 	char				Password[32];
 	uint32_t			Socket;
-	char* 				ClientId;
+	char 				ClientId[64];
 } BrokerConfig_t;
 
 /*
@@ -138,14 +138,14 @@ typedef struct State {
  * Client = Top level MQTT information.
  */
 typedef struct Client {
-	State_t				*State;
-	Buffers_t			*Buffers;
 	BrokerConfig_t		*Broker;
-	LastWill_t			*Will;
+	Buffers_t			*Buffers;
 	Callback_t			*Cb;
 	PacketInfo_t		*Packet;  // mqtt_msg.h
-	QueueHandle_t		*xSendingQueue;
-	RINGBUF				*send_rb;
+	QueueHandle_t		*SendingQueue;
+	Ringbuff_t			*Send_rb;
+	State_t				*State;
+	Will_t				*Will;
 } Client_t;
 
 #endif /* COMPONENTS_MQTT_MQTT_STRUCTS_H_ */

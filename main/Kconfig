@@ -1,3 +1,17 @@
+menu "PyHouse Configuration"
+
+config PYHOUSE_HOUSE_NAME
+	string "PyHouse House Name"
+	default "House 1"
+	help
+		House Name.
+		This must be the same for all PyHouse computers for this house.
+		This is case sensitive and may contain spaces.
+		Everything must match exactly or you will be operating on a different house.
+
+endmenu
+
+
 menu "WiFi Configuration"
 
 config PYHOUSE_WIFI_SSID
