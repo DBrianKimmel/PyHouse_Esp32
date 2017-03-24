@@ -6,32 +6,28 @@
  * @brief Handle the mqtt protocol; the various message types and their sequencing and interactions.
  */
 
-#include <stdint.h>
 #include <string.h>
 
-#include "esp_err.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-
 #include "mqtt_structs.h"
-#include "mqtt_message.h"
-#include "mqtt_transport.h"
-#include "ringbuf.h"
-
-#include "sdkconfig.h"
-
-
-// Specific error codes for the Mqtt component
-#define ESP_ERR_MQTT_OK          	ESP_OK                    /*!< No error */
-#define ESP_ERR_MQTT_FAIL        	ESP_FAIL                  /*!< General fail code */
-#define ESP_ERR_MQTT_NO_MEM      	ESP_ERR_NO_MEM            /*!< Out of memory */
-#define ESP_ERR_MQTT_ARG         	ESP_ERR_INVALID_ARG       /*!< Invalid argument */
-#define ESP_ERR_MQTT_NOT_SUPPORTED 	ESP_ERR_NOT_SUPPORTED     /*!< Indicates that API is not supported yet */
-
-
-
 
 // New Signatures
+
+static inline int mqtt_get_packet_type(uint8_t* p_buffer) {
+	return (p_buffer[0] & 0xf0) >> 4;
+}
+static inline int mqtt_get_packet_dup_flag(uint8_t* p_buffer) {
+	return (p_buffer[0] & 0x08) >> 3;
+}
+static inline int mqtt_get_packet_qos(uint8_t* p_buffer) {
+	return (p_buffer[0] & 0x06) >> 1;
+}
+static inline int mqtt_get_packet_retain(uint8_t* p_buffer) {
+	return (p_buffer[0] & 0x01);
+}
+static inline int mqtt_get_packet_connect_return_code(uint8_t* p_buffer) {
+	return p_buffer[3];
+}
+
 
 /**
  * @brief Initialize the esp Mqtt subsystem.

@@ -33,7 +33,7 @@ esp_err_t rb_init(Ringbuff_t *p_rb, uint8_t *p_buf, int32_t p_size, int32_t p_bl
 	p_rb->fill_cnt = 0;
 	p_rb->size = p_size;
 	p_rb->block_size = p_block_size;
-	ESP_LOGI(TAG, "34 rb_init - Finished.");
+	ESP_LOGI(TAG, " 34 rb_init - Finished.");
 	return ESP_OK;
 }
 

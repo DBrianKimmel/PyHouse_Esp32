@@ -26,7 +26,7 @@
 #include "pyh-esp32-wifi.h"
 
 
-static const char *TAG = "PyHouse";
+static const char *TAG = "PyHouse       ";
 // static const char *VERSION = "00.00.01"
 
 void __attribute__((noreturn)) task_fatal_error() {
@@ -43,7 +43,7 @@ void main_task(void *pvParameter) {
 	pyh_wifi_start();
 	pyh_mqtt_start();
 	// pyh_ota_start();
-	ESP_LOGI(TAG, "Started.\n");
+	ESP_LOGI(TAG, " 46 Started.\n");
 	while(1) {
 		vTaskDelay(2000 / portTICK_PERIOD_MS);
 	}
@@ -56,7 +56,7 @@ void app_main() {
 	pyh_wifi_init();
 	pyh_mqtt_init();
 	// pyh_ota_init();
-	ESP_LOGI(TAG, "Initialized.\n");
+	ESP_LOGI(TAG, " 59 Initialized.\n");
 	xTaskCreate(&main_task, "main_task", 8192, NULL, 5, NULL);
 }
 // END DBK

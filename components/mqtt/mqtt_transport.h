@@ -20,6 +20,10 @@
  * @return a socket handle.
  */
 int mqtt_transport_connect(const char *host, int port);
+void mqtt_transport_set_timeout(uint32_t p_socket, int p_timeout);
+int mqtt_transport_write(uint32_t p_socket, PacketInfo_t *p_packet);
+int mqtt_transport_read(uint32_t p_socket, uint8_t *p_buffers);
+
 
 
 #endif /* COMPONENTS_MQTT_MQTT_TRANSPORT_H_ */

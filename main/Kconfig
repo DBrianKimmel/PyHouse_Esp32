@@ -90,5 +90,13 @@ config MQTT_CLIENT_ID
 	help
 		The Identity of this client used for the above Mqtt Broker.
 
+config MQTT_USE_TLS
+	boolean "Mqtt Use Secure Broker"
+	default n
+	help
+		The TLS flag.
+		We should use port 1883 if false (No TLS) and port 8883 if true.
+		It is up to you to put in the correct port number.
+
 endmenu
 	

@@ -115,12 +115,11 @@ static int init_message(PacketInfo_t* p_packet) {
 	ESP_LOGI(TAG, "115 Init_Message - All - Buffer:%p", p_packet->PacketBuffer);
 	p_packet->PacketPayload = p_packet->PacketBuffer;
 	p_packet->PacketPayload_length = MQTT_MAX_FIXED_HEADER_SIZE;
-	ESP_LOGI(TAG, "115 Init_Message - All");
+	p_packet->PacketTopic = 0;
+	p_packet->PacketTopic_length = 0;
+	ESP_LOGI(TAG, "120 Init_Message - All");
 	return MQTT_MAX_FIXED_HEADER_SIZE;
 }
-
-
-
 
 
 
@@ -140,31 +139,33 @@ esp_err_t fail_message(PacketInfo_t *p_packet) {
 
 
 
-/*
+/**
  * Fill n the fixed header portion of the packet
  *
  * We only have enough memory to support 1 or 2 bytes of remaining length.
+ * 1 byte  =   0 - 127
+ * 2 bytes = 128 - 16383
  *
  * |===============================================================|
  * | Bit         |    7     6     5     4     3     2     1     0  |
  * |-------------|-------------------------------------------------|
- * | byte 1      | Packet type             |  A  |  B  |  C  |  D  |
+ * | byte 1      | Packet type             |  F  |  L  |  A  |  G  |
  * | byte 2      | Remaining Length...(1 to 4 Bytes)               |
  * |===============================================================|
  *
  */
-esp_err_t fini_message(PacketInfo_t* p_packet, int p_type, int p_dup, int p_qos, int p_retain) {
+esp_err_t _fixed_header(PacketInfo_t* p_packet, int p_type, int p_dup, int p_qos, int p_retain) {
 	int l_remaining_length = p_packet->PacketPayload_length - MQTT_MAX_FIXED_HEADER_SIZE;
 	ESP_LOGI(TAG, "155 Fini_Message - Remain:%d", l_remaining_length);
 	if (l_remaining_length > 127) {
-		p_packet->PacketStart = 0;
+//		p_packet->PacketStart = 0;
 		p_packet->PacketBuffer[0] = ((p_type & 0x0f) << 4) | ((p_dup & 1) << 3) | ((p_qos & 3) << 1) | (p_retain & 1);
 		p_packet->PacketBuffer[1] = 0x80 | (l_remaining_length % 128);
 		p_packet->PacketBuffer[2] = l_remaining_length / 128;
 		p_packet->PacketPayload_length = l_remaining_length + 3;
 		p_packet->PacketPayload = p_packet->PacketBuffer;
 	} else {
-		p_packet->PacketStart = 1;
+//		p_packet->PacketStart = 1;
 		p_packet->PacketBuffer[1] = ((p_type & 0x0f) << 4) | ((p_dup & 1) << 3) | ((p_qos & 3) << 1) | (p_retain & 1);
 		p_packet->PacketBuffer[2] = l_remaining_length;
 		p_packet->PacketPayload_length = l_remaining_length + 2;
@@ -338,6 +339,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
 
 
 
+
 /*
  * CONNECT – Client requests a connection to a Server
  *
@@ -356,14 +358,14 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length) {
 esp_err_t mqtt_msg_connect(Client_t* p_client) {
 	struct mqtt_connect_variable_header* l_variable_header;
 
-	ESP_LOGI(TAG, "350 Msg_Connect - Begin.");
-	p_client->Packet->PacketTopic = (uint8_t*)p_client->Will->WillTopic;
-	p_client->Packet->PacketTopic_length = strlen(p_client->Will->WillTopic);
-	p_client->Packet->PacketPayload = (uint8_t*)p_client->Will->WillMessage;
-	p_client->Packet->PacketPayload_length = strlen(p_client->Will->WillMessage);
+	ESP_LOGI(TAG, "360 Msg_Connect - Begin.");
+//	p_client->Packet->PacketTopic = (uint8_t*)p_client->Will->WillTopic;
+//	p_client->Packet->PacketTopic_length = strlen(p_client->Will->WillTopic);
+//	p_client->Packet->PacketPayload = (uint8_t*)p_client->Will->WillMessage;
+//	p_client->Packet->PacketPayload_length = strlen(p_client->Will->WillMessage);
 	init_message(p_client->Packet);
 	if (p_client->Packet->PacketPayload_length + sizeof(*l_variable_header) > p_client->Packet->PacketBuffer_length) {
-		ESP_LOGE(TAG, "357 Msg_Connect - Failed - Too big for buffer")
+		ESP_LOGE(TAG, "367 Msg_Connect - Failed - Too big for buffer")
 		return fail_message(p_client->Packet);
 	}
 // Build the variable header (10 bytes)
@@ -376,29 +378,30 @@ esp_err_t mqtt_msg_connect(Client_t* p_client) {
 	l_variable_header->flags = 0;
 	l_variable_header->keepaliveMsb = p_client->Will->Keepalive >> 8;
 	l_variable_header->keepaliveLsb = p_client->Will->Keepalive & 0xff;
-	ESP_LOGI(TAG, "370 Msg_Connect - Keepalive: %d", p_client->Will->Keepalive);
+	ESP_LOGI(TAG, "380 Msg_Connect - Keepalive: %d", p_client->Will->Keepalive);
 
 	if (p_client->Will->CleanSession) {
 		l_variable_header->flags |= MQTT_CONNECT_FLAG_CLEAN_SESSION;
 	}
+
 	if (p_client->Broker->ClientId != 0 && p_client->Broker->ClientId[0] != '\0') {
 		if (append_string(p_client->Packet, p_client->Broker->ClientId, strlen(p_client->Broker->ClientId)) != ESP_OK) {
-			ESP_LOGE(TAG, "3577 Msg_Connect - Failed - Wrong ID")
+			ESP_LOGE(TAG, "387 Msg_Connect - Failed - Wrong ID")
 			return fail_message(p_client->Packet);
 		}
 	} else {
-		ESP_LOGE(TAG, "381 Msg_Connect - Bad ID");
+		ESP_LOGE(TAG, "391 Msg_Connect - Bad ID");
 		print_packet(p_client->Packet);
 		return fail_message(p_client->Packet);
 	}
 
 	if (p_client->Will->WillTopic != 0 && p_client->Will->WillTopic[0] != '\0') {
 		if (append_string(p_client->Packet, p_client->Will->WillTopic, strlen(p_client->Will->WillTopic)) != ESP_OK) {
-			ESP_LOGE(TAG, "388 Msg_Connect - Failed - Will topic bad")
+			ESP_LOGE(TAG, "398 Msg_Connect - Failed - Will topic bad")
 			return fail_message(p_client->Packet);
 		}
 		if (append_string(p_client->Packet, p_client->Will->WillMessage, strlen(p_client->Will->WillMessage)) != ESP_OK) {
-			ESP_LOGE(TAG, "392 Msg_Connect - Failed - Will message bad")
+			ESP_LOGE(TAG, "402 Msg_Connect - Failed - Will message bad")
 			return fail_message(p_client->Packet);
 		}
 		l_variable_header->flags |= MQTT_CONNECT_FLAG_WILL;
@@ -410,7 +413,7 @@ esp_err_t mqtt_msg_connect(Client_t* p_client) {
 
 	if (p_client->Broker->Username != 0 && p_client->Broker->Username[0] != '\0') {
 		if (append_string(p_client->Packet, p_client->Broker->Username, strlen(p_client->Broker->Username)) < 0) {
-			ESP_LOGE(TAG, "413 Msg_Connect - Failed - Username")
+			ESP_LOGE(TAG, "414 Msg_Connect - Failed - Username")
 			return fail_message(p_client->Packet);
 		}
 		l_variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
@@ -418,15 +421,15 @@ esp_err_t mqtt_msg_connect(Client_t* p_client) {
 
 	if (p_client->Broker->Password != 0 && p_client->Broker->Password[0] != '\0') {
 		if (append_string(p_client->Packet, p_client->Broker->Password, strlen(p_client->Broker->Password)) < 0) {
-			ESP_LOGE(TAG, "421 Msg_Connect - Failed - Password")
+			ESP_LOGE(TAG, "422 Msg_Connect - Failed - Password")
 			return fail_message(p_client->Packet);
 		}
 		l_variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
 	}
 
-	fini_message(p_client->Packet, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
+	_fixed_header(p_client->Packet, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 	print_packet(p_client->Packet);
-	ESP_LOGI(TAG, "429 Msg_Connect - Succeeded - Connect Message")
+	ESP_LOGI(TAG, "430 Msg_Connect - Succeeded - Connect Message")
 	return ESP_OK;
 }
 
@@ -475,7 +478,7 @@ esp_err_t mqtt_msg_publish(PacketInfo_t* p_packet, const char* topic, const char
 	}
 	memcpy(p_packet->PacketBuffer + p_packet->PacketPayload_length, data, data_length);
 	p_packet->PacketPayload_length += data_length;
-	fini_message(p_packet, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 	print_packet(p_packet);
 	return ESP_OK;
 }
@@ -497,7 +500,7 @@ esp_err_t mqtt_msg_puback(PacketInfo_t* p_packet, uint16_t message_id) {
 	if (append_message_id(p_packet, message_id) == 0) {
 		return fail_message(p_packet);
 	}
-	fini_message(p_packet, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
 	print_packet(p_packet);
 	return ESP_OK;
 }
@@ -517,7 +520,7 @@ esp_err_t mqtt_msg_pubrec(PacketInfo_t* p_packet, uint16_t message_id) {
 	if (append_message_id(p_packet, message_id) == 0) {
 		return fail_message(p_packet);
 	}
-	fini_message(p_packet, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
 	print_packet(p_packet);
 	return ESP_OK;
 }
@@ -537,7 +540,7 @@ esp_err_t mqtt_msg_pubrel(PacketInfo_t* p_packet, 	uint16_t message_id) {
 	if (append_message_id(p_packet, message_id) == 0) {
 		return fail_message(p_packet);
 	}
-	fini_message(p_packet, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
 	return ESP_OK;
 }
 
@@ -557,7 +560,7 @@ esp_err_t mqtt_msg_pubcomp(PacketInfo_t* p_packet, uint16_t message_id) {
 	if (append_message_id(p_packet, message_id) == 0) {
 		return fail_message(p_packet);
 	}
-	fini_message(p_packet, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 	print_packet(p_packet);
 	return ESP_OK;
 }
@@ -598,7 +601,7 @@ esp_err_t mqtt_msg_subscribe(Client_t* p_client, const char* p_topic, int p_qos,
 		return fail_message(p_client->Packet);
 	}
 	p_client->Packet->PacketBuffer[p_client->Packet->PacketPayload_length++] = p_qos;
-	fini_message(p_client->Packet, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
+	_fixed_header(p_client->Packet, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 	print_packet(p_client->Packet);
 	ESP_LOGI(TAG,"591 Subscribe - Message ok");
 	return ESP_OK;
@@ -636,7 +639,7 @@ esp_err_t mqtt_msg_unsubscribe(PacketInfo_t* p_packet, const char* topic, uint16
 		return fail_message(p_packet);
 	if (append_string(p_packet, topic, strlen(topic)) != ESP_OK)
 		return fail_message(p_packet);
-	fini_message(p_packet, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
 	return ESP_OK;
 }
 
@@ -666,7 +669,8 @@ esp_err_t mqtt_msg_unsubscribe(PacketInfo_t* p_packet, const char* topic, uint16
 esp_err_t mqtt_msg_pingreq(PacketInfo_t* p_packet) {
 	ESP_LOGI(TAG, "655 Msg_PingReq");
 	init_message(p_packet);
-	return fini_message(p_packet, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
+	return ESP_OK;
 }
 
 
@@ -681,7 +685,8 @@ esp_err_t mqtt_msg_pingreq(PacketInfo_t* p_packet) {
 esp_err_t mqtt_msg_pingresp(PacketInfo_t* p_packet) {
 	ESP_LOGI(TAG, "670 Msg_PingResp");
 	init_message(p_packet);
-	return fini_message(p_packet, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
+	return ESP_OK;
 }
 
 
@@ -696,7 +701,8 @@ esp_err_t mqtt_msg_pingresp(PacketInfo_t* p_packet) {
 esp_err_t mqtt_msg_disconnect(PacketInfo_t* p_packet) {
 	ESP_LOGI(TAG, "685 Msg_Disconnect");
 	init_message(p_packet);
-	return fini_message(p_packet, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
+	_fixed_header(p_packet, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
+	return ESP_OK;
 }
 
 

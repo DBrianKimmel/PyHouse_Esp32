@@ -34,7 +34,7 @@
 #include "sdkconfig.h"
 
 
-static const char *TAG = "PyH_Wifi";
+static const char *TAG = "PyH_Wifi      ";
 // static const char *VERSION = "00.00.01"
 
 wifi_ap_record_t l_connected_ap;
@@ -88,7 +88,7 @@ void pyh_wifi_init() {
 	l_wifi_event_group = xEventGroupCreate();
 	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
 
-	wifi_init_config_t l_cfg = WIFI_INIT_CONFIG_DEFAULT();
+	wifi_init_config_t   l_cfg = WIFI_INIT_CONFIG_DEFAULT();
 	ESP_ERROR_CHECK(esp_wifi_init(&l_cfg));
 
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));

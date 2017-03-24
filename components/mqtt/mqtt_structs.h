@@ -10,7 +10,8 @@
 
 
 #include <stdint.h>
-
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "ringbuf.h"
 
 /*
@@ -39,16 +40,30 @@ typedef struct mqtt_message {
 } mqtt_message_t;
 
 /*
+ * Fixed header
+ * We only have enough memory to support 1 or 2 bytes of remaining length.
+ * 1 byte  =   0 - 127
+ * 2 bytes = 128 - 16383
+ *
+ * |===============================================================|
+ * | Bit         |    7     6     5     4     3     2     1     0  |
+ * |-------------|-------------------------------------------------|
+ * | byte 1      | Packet type             |  F  |  L  |  A  |  G  |
+ * | byte 2...   | Remaining Length...(1 to 4 Bytes)               |
+ * |===============================================================|
+ *
+ */
+struct mqtt_fixed_header {
+	uint8_t				packet_type_and_flags;
+	uint8_t				remaining_length[4];
+};
+/*
  * 10 bytes
  */
 struct __attribute((__packed__)) mqtt_connect_variable_header {
 	uint8_t				lengthMsb;
 	uint8_t				lengthLsb;
-//#if defined(CONFIG_MQTT_PROTOCOL_311)
 	uint8_t 			magic[4];
-//#else
-//	uint8_t magic[6];
-//#endif
 	uint8_t 			version;
 	uint8_t 			flags;
 	uint8_t 			keepaliveMsb;
@@ -62,15 +77,21 @@ struct __attribute((__packed__)) mqtt_connect_variable_header {
 typedef struct PacketInfo {
 	uint8_t				PacketType;
 	uint16_t			PacketId;
-	uint16_t			PacketStart;
+//	uint16_t			PacketStart;
 	const uint8_t		*PacketTopic;
 	uint16_t			PacketTopic_length;
-	const uint8_t		*PacketPayload;
-	uint16_t			PacketPayload_offset;
-	uint16_t			PacketPayload_length;
 	uint16_t			Packet_length;
 	uint8_t				*PacketBuffer;
 	uint16_t			PacketBuffer_length;
+//	uint16_t			PacketPayload_offset;
+
+	uint8_t				*PacketFixedHeader;
+	uint8_t				PacketFixedHeader_length;
+	uint8_t				*PacketVariableHeader;
+	uint8_t				PacketVariableHeader_length;
+	uint8_t				*PacketPayload;
+	uint16_t			PacketPayload_length;
+
 } PacketInfo_t;
 
 /**
